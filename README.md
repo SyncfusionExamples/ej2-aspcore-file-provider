@@ -1,1 +1,1 @@
-Update your product
+This repository contains the ASP.NET Core file system provider for the file manager component.
