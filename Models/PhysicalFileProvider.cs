@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
@@ -9,48 +9,24 @@ using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Syncfusion.EJ2.FileManager.Base;
 
-namespace FileManager
+namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 {
-    interface IFileManagerProviderBase
-    {
-        //public string ContentRootPath;
-        FileManagerResponse GetFiles(string path, bool showHiddenItems, params object[] data);
-
-        FileManagerResponse CreateFolder(string path, string name, params object[] data);
-
-        FileManagerResponse GetDetails(string path, string[] names, params object[] data);
-
-        FileManagerResponse Remove(string path, string[] names, params object[] data);
-
-        FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params object[] data);
-
-        FileManagerResponse CopyTo(string path, string targetPath, string[] names, string[] replacedItemNames, params object[] data);
-
-        FileManagerResponse MoveTo(string path, string targetPath, string[] names, string[] replacedItemNames, params object[] data);
-
-        FileManagerResponse Search(string path, string searchString, bool showHiddenItems, bool caseSensitive, params object[] data);
-
-        FileStreamResult Download(string path, string[] names, params object[] data);
-
-        FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, string[] replacedItemNames, params object[] data);
-
-        FileStreamResult GetImage(string path, bool allowCompress, params object[] data);
-    }
-
-    public class FileManagerProviderBase : IFileManagerProviderBase
+    public class PhysicalFileProvider : PhysicalFileProviderBase
     {
         public string contentRootPath;
         public string[] allowedExtention = new string[] { "*" };
 
-        public FileManagerProviderBase(string ContentRootPath, string[] AlowedExtention = null)
+        public PhysicalFileProvider()
         {
-            this.contentRootPath = ContentRootPath;
-
-            this.allowedExtention = AlowedExtention == null ? this.allowedExtention : allowedExtention;
         }
 
-        public virtual FileManagerResponse GetFiles(string path, bool showHiddenItems, params object[] data)
+        public void RootFolder(string name)
+        {
+            this.contentRootPath = name;
+        }
+        public FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readResponse = new FileManagerResponse();
             try
@@ -70,7 +46,7 @@ namespace FileManager
                 cwd.DateCreated = directory.CreationTime;
                 cwd.HasChild = directory.GetDirectories().Length > 0 ? true : false;
                 cwd.Type = directory.Extension;
-                cwd.FilterPath = '\\' + GetRelativePath(this.contentRootPath, directory.FullName);
+                cwd.FilterPath = GetRelativePath(this.contentRootPath, directory.Parent.FullName + "\\");
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.CWD = cwd;
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
@@ -78,7 +54,7 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
                 er.Message = e.Message.ToString();
                 readResponse.Error = er;
@@ -87,7 +63,7 @@ namespace FileManager
             }
         }
 
-        public virtual IEnumerable<FileManagerDirectoryContent> ReadFiles(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params object[] data)
+        public virtual IEnumerable<FileManagerDirectoryContent> ReadFiles(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -104,7 +80,7 @@ namespace FileManager
                                 DateCreated = file.CreationTime,
                                 HasChild = false,
                                 Type = file.Extension,
-                                FilterPath = '\\' + GetRelativePath(this.contentRootPath, directory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
                             });
                     readFiles.Files = (IEnumerable<FileManagerDirectoryContent>)files;
                 }
@@ -120,7 +96,7 @@ namespace FileManager
                                 DateCreated = file.CreationTime,
                                 HasChild = false,
                                 Type = file.Extension,
-                                FilterPath = '\\' + GetRelativePath(this.contentRootPath, directory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
                             });
                     readFiles.Files = (IEnumerable<FileManagerDirectoryContent>)files;
                 }
@@ -137,16 +113,23 @@ namespace FileManager
             if (!String.IsNullOrEmpty(rootPath) && !String.IsNullOrEmpty(fullPath))
             {
                 var rootDirectory = new DirectoryInfo(rootPath);
-                if (fullPath.Contains(rootDirectory.FullName + "\\"))
+                if (rootDirectory.FullName.Substring(rootDirectory.FullName.Length - 1) == "\\")
                 {
-                    return fullPath.Substring(rootPath.Length + 1);
+                    if (fullPath.Contains(rootDirectory.FullName))
+                    {
+                        return fullPath.Substring(rootPath.Length - 1);
+                    }
+                }
+                else if (fullPath.Contains(rootDirectory.FullName + "\\"))
+                {
+                    return "\\" + fullPath.Substring(rootPath.Length + 1);
                 }
             }
             return String.Empty;
         }
 
 
-        public virtual IEnumerable<FileManagerDirectoryContent> ReadDirectories(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params object[] data)
+        public virtual IEnumerable<FileManagerDirectoryContent> ReadDirectories(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readDirectory = new FileManagerResponse();
             try
@@ -163,7 +146,7 @@ namespace FileManager
                                 DateCreated = subDirectory.CreationTime,
                                 HasChild = subDirectory.GetDirectories().Length > 0 ? true : false,
                                 Type = subDirectory.Extension,
-                                FilterPath = '\\' + GetRelativePath(this.contentRootPath, subDirectory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
                             });
                     readDirectory.Files = (IEnumerable<FileManagerDirectoryContent>)directories;
                 }
@@ -178,7 +161,7 @@ namespace FileManager
                         DateCreated = subDirectory.CreationTime,
                         HasChild = subDirectory.GetDirectories().Length > 0 ? true : false,
                         Type = subDirectory.Extension,
-                        FilterPath = '\\' + GetRelativePath(this.contentRootPath, subDirectory.FullName)
+                        FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
                     });
                     readDirectory.Files = (IEnumerable<FileManagerDirectoryContent>)directories;
                 }
@@ -189,7 +172,7 @@ namespace FileManager
                 throw e;
             }
         }
-        public virtual FileManagerResponse CreateFolder(string path, string name, params object[] data)
+        public FileManagerResponse CreateFolder(string path, string name, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse createResponse = new FileManagerResponse();
             try
@@ -201,7 +184,7 @@ namespace FileManager
                 if (directoryExist)
                 {
                     var exist = new DirectoryInfo(newDirectoryPath);
-                    ErrorProperty er = new ErrorProperty();
+                    ErrorDetails er = new ErrorDetails();
                     er.Code = "400";
                     er.Message = "A file or folder with the name " + exist.Name.ToString() + " already exists.";
                     createResponse.Error = er;
@@ -225,7 +208,7 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
                 er.Message = e.Message.ToString();
                 createResponse.Error = er;
@@ -233,18 +216,21 @@ namespace FileManager
                 return createResponse;
             }
         }
-        ////need to be work on GetInfo
-        public virtual FileManagerResponse GetDetails(string path, string[] names, params object[] data)
+        public FileManagerResponse GetDetails(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse getDetailResponse = new FileManagerResponse();
             FileDetails detailFiles = new FileDetails();
             try
             {
-                if (names.Length == 1)
+                if (names.Length == 0 || names.Length == 1)
                 {
                     if (path == null) { path = string.Empty; };
                     var fullPath = "";
-                    if (names[0] == null || names[0] == "")
+                    if (names.Length == 0)
+                    {
+                        fullPath = (contentRootPath + path.Substring(0, path.Length - 1));
+                    }
+                    else if (names[0] == null || names[0] == "")
                     {
                         fullPath = (contentRootPath + path);
                     }
@@ -257,10 +243,10 @@ namespace FileManager
                     FileDetails fileDetails = new FileDetails();
                     var baseDirectory = new DirectoryInfo(this.contentRootPath);
                     fileDetails.Name = info.Name == "" ? directory.Name : info.Name;
-                    fileDetails.IsFile = info.Attributes.ToString() == "Directory" ? false : true;
-                    fileDetails.Size = info.Attributes.ToString() != "Directory" ? byteConversion(info.Length).ToString() : byteConversion(new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => (file.Length))).ToString();
+                    fileDetails.IsFile = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory;
+                    fileDetails.Size = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory ? byteConversion(info.Length).ToString() : byteConversion(new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => (file.Length))).ToString();
                     fileDetails.Created = info.CreationTime;
-                    fileDetails.Location = '\\' + GetRelativePath(baseDirectory.Parent.FullName, info.FullName);
+                    fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.FullName);
                     fileDetails.Modified = info.LastWriteTime;
                     detailFiles = fileDetails;
                 }
@@ -282,8 +268,8 @@ namespace FileManager
                         var baseDirectory = new DirectoryInfo(this.contentRootPath);
                         FileInfo info = new FileInfo(fullPath);
                         fileDetails.Name = string.Join(", ", names);
-                        fileDetails.Size = (long.Parse(fileDetails.Size) + ((info.Extension != "") ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
-                        fileDetails.Location = '\\' + GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                        fileDetails.Size = (long.Parse(fileDetails.Size) + ((info.Attributes.ToString() != "Directory") ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
+                        fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
                     fileDetails.MultipleFiles = true;
@@ -294,16 +280,15 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
-                er.Message = e.Message.ToString();
+                er.Message = e.ToString();
                 getDetailResponse.Error = er;
-
                 return getDetailResponse;
             }
         }
 
-        public virtual FileManagerResponse Remove(string path, string[] names, params object[] data)
+        public virtual FileManagerResponse Remove(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
             FileManagerDirectoryContent[] removedFiles = new FileManagerDirectoryContent[names.Length];
@@ -337,7 +322,7 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
                 er.Message = e.Message.ToString();
                 DeleteResponse.Error = er;
@@ -346,7 +331,7 @@ namespace FileManager
             }
         }
 
-        public virtual FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params object[] data)
+        public FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse renameResponse = new FileManagerResponse();
             try
@@ -357,7 +342,7 @@ namespace FileManager
                 FileAttributes attr = File.GetAttributes(oldPath);
 
                 FileInfo info = new FileInfo(oldPath);
-                var isFile = (info.Attributes.ToString() != "Directory") ? true : false;
+                var isFile = (File.GetAttributes(oldPath) & FileAttributes.Directory) != FileAttributes.Directory;
                 if (isFile)
                 {
                     info.MoveTo(newPath);
@@ -365,15 +350,21 @@ namespace FileManager
                 else
                 {
                     var directoryExist = Directory.Exists(newPath);
-                    if (directoryExist)
+                    if (directoryExist && !oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
                     {
                         var exist = new DirectoryInfo(newPath);
-                        ErrorProperty er = new ErrorProperty();
+                        ErrorDetails er = new ErrorDetails();
                         er.Code = "400";
                         er.Message = "Cannot rename " + exist.Name.ToString() + " to " + newName + ": destination already exists.";
                         renameResponse.Error = er;
 
                         return renameResponse;
+                    }
+                    else if (oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        tempPath = Path.Combine(tempPath + "Syncfusion_TempFolder");
+                        Directory.Move(oldPath, tempPath);
+                        Directory.Move(tempPath, newPath);
                     }
                     else
                     {
@@ -388,199 +379,296 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
-                er.Message = e.Message.ToString();
+                er.Message = e.ToString();
                 renameResponse.Error = er;
 
                 return renameResponse;
             }
         }
 
-        public virtual FileManagerResponse CopyTo(string path, string targetPath, string[] names, string[] replacedItemNames, params object[] data)
+        public FileManagerResponse CopyTo(string path, string targetPath, string[] names, string[] renamedItemNames, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse copyResponse = new FileManagerResponse();
             try
             {
-                if (replacedItemNames.Length > 0)
-                {
-                    names = replacedItemNames;
-                }
-                FileManagerDirectoryContent[] copiedFiles = new FileManagerDirectoryContent[names.Length];
                 var existFiles = new List<string>();
-                var tempPath = Path.Combine(contentRootPath, path);
+                var missingFiles = new List<string>();
+                var copiedFiles = new List<FileManagerDirectoryContent>();
+                var tempPath = path;
                 for (int i = 0; i < names.Length; i++)
                 {
-                    FileAttributes fileAttributes = File.GetAttributes(Path.Combine(contentRootPath, path, names[i]));
-                    if ((fileAttributes & FileAttributes.Directory) == FileAttributes.Directory) //Fixed if the directory is compressed
+                    var fullname = names[i];
+                    int name = names[i].LastIndexOf("/");
+                    if (name >= 0)
                     {
-                        var directoryName = names[i];
-                        var oldPath = Path.Combine(contentRootPath, path, directoryName);
-                        var newPath = Path.Combine(contentRootPath, targetPath, directoryName);
-                        var exist = Directory.Exists(newPath);
-                        if (exist && !(replacedItemNames.Length > 0))
+                        path = tempPath + names[i].Substring(0, name + 1);
+                        names[i] = names[i].Substring(name + 1);
+                    }
+                    else
+                    {
+                        path = tempPath;
+                    }
+                    var itemPath = Path.Combine(contentRootPath + path, names[i]);
+                    if (Directory.Exists(itemPath) || File.Exists(itemPath))
+                    {
+                        FileAttributes fileAttributes = File.GetAttributes(itemPath);
+                        if (fileAttributes == FileAttributes.Directory)
                         {
-                            if (newPath == oldPath)
+                            var directoryName = names[i];
+                            var oldPath = Path.Combine(contentRootPath + path, directoryName);
+                            var newPath = Path.Combine(contentRootPath + targetPath, directoryName);
+                            var exist = Directory.Exists(newPath);
+                            if (exist)
                             {
-                                int directoryCount = 0;
-                                while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "")))
+                                int index = -1;
+                                if (renamedItemNames.Length > 0)
                                 {
-                                    directoryCount++;
+                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(directoryName));
                                 }
-                                newPath = newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
-                                DirectoryCopy(oldPath, newPath, replacedItemNames, "copy");
-                                var directory = new DirectoryInfo(newPath);
-                                copiedFiles[i] = GetFileDetails(newPath);
+                                if ((newPath == oldPath) || (index != -1))
+                                {
+                                    newPath = DirectoryRename(newPath);
+                                    DirectoryCopy(oldPath, newPath);
+                                    var detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    copiedFiles.Add(detail);
+                                }
+                                else
+                                {
+                                    existFiles.Add(fullname);
+                                }
                             }
                             else
                             {
-                                existFiles.Add(newPath);
+                                DirectoryCopy(oldPath, newPath);
+                                var detail = GetFileDetails(newPath);
+                                detail.PreviousName = names[i];
+                                copiedFiles.Add(detail);
                             }
                         }
                         else
                         {
-                            DirectoryCopy(oldPath, newPath, replacedItemNames, "copy");
-                            var directory = new DirectoryInfo(newPath);
-                            copiedFiles[i] = GetFileDetails(newPath);
+                            var fileName = names[i];
+                            var newFilePath = Path.Combine(targetPath, fileName);
+                            var oldPath = Path.Combine(contentRootPath + path, fileName);
+                            var newPath = Path.Combine(contentRootPath + targetPath, fileName);
+                            var fileExist = System.IO.File.Exists(newPath);
+
+                            if (fileExist)
+                            {
+                                int index = -1;
+                                if (renamedItemNames.Length > 0)
+                                {
+                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(fileName));
+                                }
+                                if ((newPath == oldPath) || (index != -1))
+                                {
+                                    newPath = FileRename(newPath, fileName);
+                                    File.Copy(oldPath, newPath);
+                                    var detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    copiedFiles.Add(detail);
+                                }
+                                else
+                                {
+                                    existFiles.Add(fullname);
+                                }
+                            }
+                            else
+                            {
+                                if (renamedItemNames.Length > 0)
+                                {
+                                    File.Delete(newPath);
+                                }
+                                File.Copy(oldPath, newPath);
+                                var detail = GetFileDetails(newPath);
+                                detail.PreviousName = names[i];
+                                copiedFiles.Add(detail);
+                            }
                         }
                     }
                     else
                     {
-                        var fileName = names[i];
-                        var newFilePath = Path.Combine(targetPath, fileName);
-                        var oldPath = Path.Combine(contentRootPath, path, fileName);
-                        var newPath = Path.Combine(contentRootPath, targetPath, fileName);
-                        var fileExist = System.IO.File.Exists(newPath);
-
-                        if (fileExist && !(replacedItemNames.Length > 0))
-                        {
-                            if (newPath == oldPath)
-                            {
-                                int name = newPath.LastIndexOf(".");
-                                if (name >= 0)
-                                    newPath = newPath.Substring(0, name);
-                                int fileCount = 0;
-                                while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName))))
-                                {
-                                    fileCount++;
-                                }
-                                newPath = newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
-                                File.Copy(oldPath, newPath);
-                                copiedFiles[i] = GetFileDetails(newPath);
-                            }
-                            else
-                            {
-                                existFiles.Add(newPath);
-                            }
-                        }
-                        else
-                        {
-                            if (replacedItemNames.Length > 0)
-                            {
-                                File.Delete(newPath);
-                            }
-                            File.Copy(oldPath, newPath);
-                            copiedFiles[i] = GetFileDetails(newPath);
-                        }
+                        missingFiles.Add(names[i]);
                     }
                 }
                 copyResponse.Files = copiedFiles;
                 if (existFiles.Count > 0)
                 {
-                    ErrorProperty er = new ErrorProperty();
+                    ErrorDetails er = new ErrorDetails();
                     er.FileExists = existFiles;
-
+                    er.Code = "400";
+                    er.Message = "File Already Exists";
                     copyResponse.Error = er;
                 }
-                return copyResponse;
+                if (missingFiles.Count == 0)
+                {
+                    return copyResponse;
+                }
+                else
+                {
+                    string namelist = missingFiles[0];
+                    for (int k = 1; k < missingFiles.Count; k++)
+                    {
+                        namelist = namelist + ", " + missingFiles[k];
+                    }
+                    throw new FileNotFoundException(namelist + " not found in given location.");
+                }
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.FileExists = copyResponse.Error?.FileExists;
                 copyResponse.Error = er;
 
                 return copyResponse;
             }
         }
 
-        public virtual FileManagerResponse MoveTo(string path, string targetPath, string[] names, string[] replacedItemNames = null, params object[] data)
+        public FileManagerResponse MoveTo(string path, string targetPath, string[] names, string[] renamedItemNames, params FileManagerDirectoryContent[] data)
         {
-            FileManagerResponse pasteResponse = new FileManagerResponse();
+            FileManagerResponse moveResponse = new FileManagerResponse();
             try
             {
-                if (replacedItemNames.Length > 0)
-                {
-                    names = replacedItemNames;
-                }
                 var existFiles = new List<string>();
-                FileManagerDirectoryContent[] copiedFiles = new FileManagerDirectoryContent[names.Length];
-                var tempPath = Path.Combine(contentRootPath, path);
+                var missingFiles = new List<string>();
+                var movedFiles = new List<FileManagerDirectoryContent>();
+                var tempPath = path;
                 for (int i = 0; i < names.Length; i++)
                 {
-                    FileAttributes fileAttributes = File.GetAttributes(Path.Combine(contentRootPath, path, names[i]));
-                    if ((fileAttributes & FileAttributes.Directory) == FileAttributes.Directory) //Fixed if the directory is compressed
+                    var fullName = names[i];
+                    int name = names[i].LastIndexOf("/");
+                    if (name >= 0)
                     {
-                        var directoryName = names[i];
-                        var oldPath = Path.Combine(contentRootPath, path, directoryName);
-                        var newPath = Path.Combine(contentRootPath, targetPath, directoryName);
-                        var exist = File.Exists(newPath);
-                        if (exist && (replacedItemNames.Length < 0))
+                        path = tempPath + names[i].Substring(0, name + 1);
+                        names[i] = names[i].Substring(name + 1);
+                    }
+                    else
+                    {
+                        path = tempPath;
+                    }
+                    var itemPath = Path.Combine(contentRootPath + path, names[i]);
+                    if (Directory.Exists(itemPath) || File.Exists(itemPath))
+                    {
+                        FileAttributes fileAttributes = File.GetAttributes(itemPath);
+                        if (fileAttributes == FileAttributes.Directory)
                         {
-                            existFiles.Add(newPath);
+                            var directoryName = names[i];
+                            var oldPath = Path.Combine(contentRootPath + path, directoryName);
+                            var newPath = Path.Combine(contentRootPath + targetPath, directoryName);
+                            var exist = Directory.Exists(newPath);
+                            if (exist)
+                            {
+                                int index = -1;
+                                if (renamedItemNames.Length > 0)
+                                {
+                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(directoryName));
+                                }
+                                if ((newPath == oldPath) || (index != -1))
+                                {
+                                    newPath = DirectoryRename(newPath);
+                                    Directory.Move(oldPath, newPath);
+                                    var detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    movedFiles.Add(detail);
+                                }
+                                else
+                                {
+                                    existFiles.Add(fullName);
+                                }
+                            }
+                            else
+                            {
+                                Directory.Move(oldPath, newPath);
+                                var detail = GetFileDetails(newPath);
+                                detail.PreviousName = names[i];
+                                movedFiles.Add(detail);
+                            }
                         }
                         else
                         {
-                            DirectoryCopy(oldPath, newPath, replacedItemNames, "paste");
-                            var directory = new DirectoryInfo(newPath);
-                            copiedFiles[i] = GetFileDetails(newPath);
+                            var fileName = names[i];
+                            var newFilePath = Path.Combine(targetPath, fileName);
+                            var oldPath = Path.Combine(contentRootPath + path, fileName);
+                            var newPath = Path.Combine(contentRootPath + targetPath, fileName);
+                            var fileExist = File.Exists(newPath);
+
+                            if (fileExist)
+                            {
+                                int index = -1;
+                                if (renamedItemNames.Length > 0)
+                                {
+                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(fileName));
+                                }
+                                if ((newPath == oldPath) || (index != -1))
+                                {
+                                    newPath = FileRename(newPath, fileName);
+                                    File.Move(oldPath, newPath);
+                                    var detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    movedFiles.Add(detail);
+                                }
+                                else
+                                {
+                                    existFiles.Add(fullName);
+                                }
+                            }
+                            else
+                            {
+                                File.Move(oldPath, newPath);
+                                var detail = GetFileDetails(newPath);
+                                detail.PreviousName = names[i];
+                                movedFiles.Add(detail);
+                            }
                         }
                     }
                     else
                     {
-                        var fileName = names[i];
-                        var newFilePath = Path.Combine(targetPath, fileName);
-                        var oldPath = Path.Combine(contentRootPath, path, fileName);
-                        var newPath = Path.Combine(contentRootPath, targetPath, fileName);
-                        var fileExist = File.Exists(newPath);
-
-                        if (fileExist && !(replacedItemNames.Length > 0))
-                        {
-                            existFiles.Add(newPath);
-                        }
-                        else
-                        {
-                            if (replacedItemNames.Length > 0)
-                            {
-                                File.Delete(newPath);
-                            }
-                            File.Move(oldPath, newPath);
-                            copiedFiles[i] = GetFileDetails(newPath);
-                        }
+                        missingFiles.Add(names[i]);
                     }
                 }
-                pasteResponse.Files = copiedFiles;
+                moveResponse.Files = movedFiles;
                 if (existFiles.Count > 0)
                 {
-                    ErrorProperty er = new ErrorProperty();
+                    ErrorDetails er = new ErrorDetails();
                     er.FileExists = existFiles;
-
-                    pasteResponse.Error = er;
+                    er.Code = "400";
+                    er.Message = "File Already Exists";
+                    moveResponse.Error = er;
                 }
-                return pasteResponse;
+                if (missingFiles.Count == 0)
+                {
+                    return moveResponse;
+                }
+                else
+                {
+                    string namelist = missingFiles[0];
+                    for (int k = 1; k < missingFiles.Count; k++)
+                    {
+                        namelist = namelist + ", " + missingFiles[k];
+                    }
+                    throw new FileNotFoundException(namelist + " not found in given location.");
+                }
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
-                er.Code = "404";
-                er.Message = e.Message.ToString();
-                pasteResponse.Error = er;
-                return pasteResponse;
+                ErrorDetails er = new ErrorDetails
+                {
+                    Code = "404",
+                    Message = e.Message.ToString(),
+                    FileExists = moveResponse.Error?.FileExists
+
+                };
+                moveResponse.Error = er;
+                return moveResponse;
             }
         }
 
-        public virtual FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params object[] data)
+        public FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse searchResponse = new FileManagerResponse();
             try
@@ -598,7 +686,7 @@ namespace FileManager
                 cwd.DateCreated = directory.CreationTime;
                 cwd.HasChild = directory.GetDirectories().Length > 0 ? true : false;
                 cwd.Type = directory.Extension;
-                cwd.FilterPath = '\\' + GetRelativePath(this.contentRootPath, directory.FullName);
+                cwd.FilterPath = GetRelativePath(this.contentRootPath, directory.Parent.FullName + "\\");
                 searchResponse.CWD = cwd;
 
                 List<FileManagerDirectoryContent> foundedFiles = new List<FileManagerDirectoryContent>();
@@ -639,7 +727,7 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Code = "404";
                 er.Message = e.Message.ToString();
                 searchResponse.Error = er;
@@ -676,7 +764,7 @@ namespace FileManager
                        + "$";
         }
 
-        public virtual FileStreamResult GetImage(string path, bool allowCompress, params object[] data)
+        public FileStreamResult GetImage(string path, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -691,7 +779,7 @@ namespace FileManager
             }
         }
 
-        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, string[] replacedItemNames, params object[] data)
+        public  FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
             try
@@ -701,20 +789,13 @@ namespace FileManager
                 {
                     if (uploadFiles != null)
                     {
-                        var filename = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
-                        filename = Path.Combine(this.contentRootPath + path, filename);
-                        if (action == "Remove")
+                        var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                        var fullName = Path.Combine(this.contentRootPath + path, name);
+                        if (action == "Save")
                         {
-                            if (System.IO.File.Exists(filename))
+                            if (!System.IO.File.Exists(fullName))
                             {
-                                System.IO.File.Delete(filename);
-                            }
-                        }
-                        else
-                        {
-                            if (!System.IO.File.Exists(filename))
-                            {
-                                using (FileStream fs = System.IO.File.Create(filename))
+                                using (FileStream fs = System.IO.File.Create(fullName))
                                 {
                                     file.CopyTo(fs);
                                     fs.Flush();
@@ -722,14 +803,59 @@ namespace FileManager
                             }
                             else
                             {
-                                existFiles.Add(filename);
+                                existFiles.Add(fullName);
+                            }
+                        }
+                        else if (action == "Remove")
+                        {
+                            if (System.IO.File.Exists(fullName))
+                            {
+                                System.IO.File.Delete(fullName);
+                            }
+                            else
+                            {
+                                ErrorDetails er = new ErrorDetails();
+                                er.Code = "404";
+                                er.Message = "File not found.";
+                                uploadResponse.Error = er;
+                            }
+                        }
+                        else if (action == "Replace")
+                        {
+                            if (System.IO.File.Exists(fullName))
+                            {
+                                System.IO.File.Delete(fullName);
+                            }
+                            using (FileStream fs = System.IO.File.Create(fullName))
+                            {
+                                file.CopyTo(fs);
+                                fs.Flush();
+                            }
+                        }
+                        else if (action == "KeepBoth")
+                        {
+                            var newName = fullName;
+                            int index = newName.LastIndexOf(".");
+                            if (index >= 0)
+                                newName = newName.Substring(0, index);
+                            int fileCount = 0;
+                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
+                            {
+                                fileCount++;
+                            }
+                            newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
+                            using (FileStream fs = System.IO.File.Create(newName))
+                            {
+                                file.CopyTo(fs);
+                                fs.Flush();
                             }
                         }
                     }
                 }
                 if (existFiles.Count != 0)
                 {
-                    ErrorProperty er = new ErrorProperty();
+                    ErrorDetails er = new ErrorDetails();
+                    er.Code = "400";
                     er.Message = "File already exists.";
                     er.FileExists = existFiles;
                     uploadResponse.Error = er;
@@ -738,24 +864,24 @@ namespace FileManager
             }
             catch (Exception e)
             {
-                ErrorProperty er = new ErrorProperty();
+                ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
                 uploadResponse.Error = er;
-
                 return uploadResponse;
             }
         }
 
-        public virtual FileStreamResult Download(string path, string[] names, params object[] data)
+        public virtual FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             try
             {
-                String extension;
+                String fullPath;
                 int count = 0;
                 for (var i = 0; i < names.Length; i++)
                 {
-                    extension = Path.GetExtension(names[i]);
-                    if (extension != "")
+                    fullPath = Path.Combine(contentRootPath + path, names[i]);
+                    FileAttributes fileAttributes = File.GetAttributes(fullPath);
+                    if (fileAttributes != FileAttributes.Directory)
                     {
                         count++;
                     }
@@ -802,6 +928,10 @@ namespace FileManager
                     string fileName = Guid.NewGuid().ToString() + "temp.zip";
                     string newFileName = fileName.Substring(36);
                     tempPath = Path.Combine(Path.GetTempPath(), newFileName);
+                    if (System.IO.File.Exists(tempPath))
+                    {
+                        System.IO.File.Delete(tempPath);
+                    }
                     string currentDirectory;
                     ZipArchiveEntry zipEntry;
                     ZipArchive archive;
@@ -839,6 +969,10 @@ namespace FileManager
                         return null;
                     }
                 }
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
                 return fileStreamResult;
             }
             catch (Exception)
@@ -861,7 +995,15 @@ namespace FileManager
                 }
                 if (names.Length == 1)
                 {
-                    fullPath = Path.Combine(contentRootPath + path, names[0]);
+                    var directoryName = new DirectoryInfo(contentRootPath);
+                    if (directoryName.Name != names[0])
+                    {
+                        fullPath = Path.Combine(contentRootPath + path, names[0]);
+                    }
+                    else
+                    {
+                        fullPath = Path.Combine(contentRootPath + path);
+                    }
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
@@ -869,57 +1011,42 @@ namespace FileManager
                 }
                 else
                 {
-                    string extension;
                     string currentDirectory;
                     ZipArchiveEntry zipEntry;
                     ZipArchive archive;
-                    if (count == 0)
+                    using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                     {
-                        string directory = this.contentRootPath + path;
-                        using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
+                        for (var i = 0; i < names.Length; i++)
                         {
-                            for (var i = 0; i < names.Length; i++)
+                            currentDirectory = Path.Combine((contentRootPath + path), names[i]);
+                            FileAttributes fileAttributes = File.GetAttributes(currentDirectory);
+                            if (fileAttributes == FileAttributes.Directory)
                             {
-                                currentDirectory = directory;
-                                foreach (var filePath in Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories))
+                                var files = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
+                                if (files.Length == 0)
                                 {
-                                    zipEntry = archive.CreateEntryFromFile(filePath, names[i] + filePath.Substring(currentDirectory.Length), CompressionLevel.Fastest);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        string lastSelected = names[names.Length - 1];
-                        string selectedExtension = Path.GetExtension(lastSelected);
-                        using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
-                        {
-                            for (var i = 0; i < names.Length; i++)
-                            {
-                                extension = Path.GetExtension(names[i]);
-                                currentDirectory = Path.Combine((contentRootPath + path), names[i]);
-                                if (extension == "")
-                                {
-                                    if (Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories).Length == 0)
-                                    {
-                                        zipEntry = archive.CreateEntry(names[i] + "/");
-                                    }
-                                    else
-                                    {
-                                        foreach (var filePath in Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories))
-                                        {
-                                            zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, filePath), filePath.Substring(path.Length), CompressionLevel.Fastest);
-                                        }
-                                    }
-
+                                    zipEntry = archive.CreateEntry(names[i] + "/");
                                 }
                                 else
                                 {
-                                    zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
+                                    foreach (var filePath in files)
+                                    {
+                                        zipEntry = archive.CreateEntryFromFile(filePath, names[i] + filePath.Substring(currentDirectory.Length), CompressionLevel.Fastest);
+                                    }
+                                }
+                                foreach (var filePath in Directory.GetDirectories(currentDirectory, "*", SearchOption.AllDirectories))
+                                {
+                                    if (Directory.GetFiles(filePath).Length == 0)
+                                    {
+                                        zipEntry = archive.CreateEntry(names[i] + filePath.Substring(currentDirectory.Length) + "/");
+                                    }
                                 }
                             }
+                            else
+                            {
+                                zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
+                            }
                         }
-
                     }
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "application/force-download");
@@ -937,8 +1064,35 @@ namespace FileManager
             }
         }
 
+        private string DirectoryRename(string newPath)
+        {
+            int directoryCount = 0;
+            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "")))
+            {
+                directoryCount++;
+            }
+            newPath = newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
+            return newPath;
+        }
 
-        private void DirectoryCopy(string sourceDirName, string destDirName, string[] replacedItemNames, string action)
+        private string FileRename(string newPath, string fileName)
+        {
+            int name = newPath.LastIndexOf(".");
+            if (name >= 0)
+            {
+                newPath = newPath.Substring(0, name);
+            }
+            int fileCount = 0;
+            while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName))))
+            {
+                fileCount++;
+            }
+            newPath = newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
+            return newPath;
+        }
+
+
+        private void DirectoryCopy(string sourceDirName, string destDirName)
         {
             try
             {
@@ -958,34 +1112,13 @@ namespace FileManager
                 {
                     var oldPath = Path.Combine(sourceDirName, file.Name);
                     var temppath = Path.Combine(destDirName, file.Name);
-                    var fileExist = File.Exists(temppath);
-                    if (!fileExist)
-                    {
-                        if (action != "paste")
-                        {
-                            file.CopyTo(temppath, true);
-                        }
-                        else
-                        {
-                            File.Move(oldPath, temppath);
-                        }
-                    }
-                    else if (fileExist && replacedItemNames.Length > 0)
-                    {
-                        File.Delete(temppath);
-                        if (action != "paste")
-                        {
-                            file.CopyTo(temppath, true);
-                        }
-                        else
-                        {
-                            File.Move(oldPath, temppath);
-                        }
-                    }
+                    File.Copy(oldPath, temppath);
                 }
-                if (action == "paste")
+                foreach (var direc in dirs)
                 {
-                    DeleteDirectory(sourceDirName);
+                    var oldPath = Path.Combine(sourceDirName, direc.Name);
+                    var temppath = Path.Combine(destDirName, direc.Name);
+                    DirectoryCopy(oldPath, temppath);
                 }
             }
             catch (Exception e)
@@ -1039,7 +1172,7 @@ namespace FileManager
                     DateCreated = info.CreationTime,
                     Type = info.Extension,
                     HasChild = isFile ? false : (info.Directory.GetDirectories().Length > 0 ? true : false),
-                    FilterPath = '\\' + GetRelativePath(this.contentRootPath, info.FullName)
+                    FilterPath = GetRelativePath(this.contentRootPath, info.DirectoryName + "\\")
                 };
             }
             catch (Exception e)
@@ -1057,77 +1190,5 @@ namespace FileManager
                 }
             });
         }
-    }
-
-
-    public class FileManagerResponse
-    {
-        public FileManagerDirectoryContent CWD { get; set; }
-        public IEnumerable<FileManagerDirectoryContent> Files { get; set; }
-
-        public ErrorProperty Error { get; set; }
-
-        public FileDetails Details { get; set; }
-
-    }
-    public class ErrorProperty
-    {
-        public string Code { get; set; }
-
-        public string Message { get; set; }
-
-        public IEnumerable<string> FileExists { get; set; }
-    }
-    public class ImageSize
-    {
-        public int Height { get; set; }
-        public int Width { get; set; }
-    }
-    public class FileDetails
-    {
-        public string Name { get; set; }
-        public string Location { get; set; }
-        public bool IsFile { get; set; }
-        public string Size { get; set; }
-        public DateTime Created { get; set; }
-        public DateTime Modified { get; set; }
-        public bool MultipleFiles { get; set; }
-    }
-    public class FileManagerParams
-    {
-        public string Name { get; set; }
-
-        public string[] Names { get; set; }
-
-        public string Path { get; set; }
-
-        public string TargetPath { get; set; }
-
-        public string NewName { get; set; }
-
-        public object Date { get; set; }
-
-        public IEnumerable<IFormFile> FileUpload { get; set; }
-
-        public string[] ReplacedItemNames { get; set; }
-    }
-    public class FileManagerDirectoryContent
-    {
-
-        public string Name { get; set; }
-
-        public long Size { get; set; }
-
-        public DateTime DateModified { get; set; }
-
-        public DateTime DateCreated { get; set; }
-
-        public bool HasChild { get; set; }
-
-        public bool IsFile { get; set; }
-
-        public string Type { get; set; }
-
-        public string FilterPath { get; set; }
     }
 }
