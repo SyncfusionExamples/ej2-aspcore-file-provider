@@ -1,4 +1,4 @@
-﻿using FileManager;
+﻿using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -8,33 +8,36 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
+using Syncfusion.EJ2.FileManager.Base;
+using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
 
-
-namespace EJ2FileManagerServices.Controllers
+namespace EJ2APIServices.Controllers
 {
 
     [Route("api/[controller]")]
     [EnableCors("AllowAllOrigins")]
     public class FileManagerController : Controller
     {
-        public FileManagerProviderBase operation;
-        public string basePath;        
+        public PhysicalFileProvider operation;
+        public string basePath;
+        string root = "wwwroot\\Files";
         public FileManagerController(IHostingEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
-            this.operation = new FileManagerProviderBase(this.basePath + "\\wwwroot\\Files" );
+            this.operation = new PhysicalFileProvider();
+            this.operation.RootFolder(this.basePath + "\\" + this.root);
         }
         [Route("FileOperations")]
-        public object FileOperations([FromBody] FEParams args)
+        public object FileOperations([FromBody] FMParams args)
         {
             if (args.action == "Remove" || args.action == "Rename")
             {
                 if ((args.targetPath == null) && (args.path == ""))
                 {
                     FileManagerResponse response = new FileManagerResponse();
-                    ErrorProperty er = new ErrorProperty
+                    ErrorDetails er = new ErrorDetails
                     {
-                        Code = "403",
+                        Code = "401",
                         Message = "Restricted to modify the root folder."
                     };
                     response.Error = er;
@@ -47,6 +50,10 @@ namespace EJ2FileManagerServices.Controllers
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.path, args.showHiddenItems));
                 case "Remove":
                     return this.operation.ToCamelCase(this.operation.Remove(args.path, args.itemNames));
+                case "CopyTo":
+                    return this.operation.ToCamelCase(this.operation.CopyTo(args.path, args.targetPath, args.itemNames, args.renameItems));
+                case "MoveTo":
+                    return this.operation.ToCamelCase(this.operation.MoveTo(args.path, args.targetPath, args.itemNames, args.renameItems));
                 case "GetDetails":
                     return this.operation.ToCamelCase(this.operation.GetDetails(args.path, args.itemNames));
                 case "CreateFolder":
@@ -62,33 +69,37 @@ namespace EJ2FileManagerServices.Controllers
         [Route("Upload")]
         public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
         {
-            FileManagerResponse uploadResponse;
-            uploadResponse = operation.Upload(path, uploadFiles, action, null);
-            if (uploadResponse.Error != null)
-            {
-                Response.Clear();
-                Response.ContentType = "application/json; charset=utf-8";
-                Response.StatusCode = 204;
-                Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
-            }
+            //FileManagerResponse uploadResponse;
+            //uploadResponse = operation.Upload(path, uploadFiles, action, null);
+            //if (uploadResponse.Error != null)
+            //{
+            //    Response.Clear();
+            //    Response.ContentType = "application/json; charset=utf-8";
+            //    Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
+            //    Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
+            //}
+            Response.Clear();
+            Response.ContentType = "application/json; charset=utf-8";
+            Response.StatusCode = 403;
+            Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = "File Manager's upload functionality is restricted in the online demo. If you need to test upload functionality, please install Syncfusion Essential Studio on your machine and run the demo.";
             return Content("");
         }
 
         [Route("Download")]
         public IActionResult Download(string downloadInput)
         {
-            FEParams args = JsonConvert.DeserializeObject<FEParams>(downloadInput);      
+            FMParams args = JsonConvert.DeserializeObject<FMParams>(downloadInput);
             return operation.Download(args.path, args.itemNames);
         }
 
 
         [Route("GetImage")]
-        public IActionResult GetImage(FEParams args)
+        public IActionResult GetImage(FMParams args)
         {
-            return this.operation.GetImage(args.path, true);
+            return this.operation.GetImage(args.path,false,null, null);
         }       
     }
-    public class FEParams
+    public class FMParams
     {
         public string action { get; set; }
 
@@ -103,7 +114,7 @@ namespace EJ2FileManagerServices.Controllers
         public string name { get; set; }
 
         public bool caseSensitive { get; set; }
-        public string[] CommonFiles { get; set; }
+        public string[] renameItems { get; set; }
 
         public string searchString { get; set; }
 
@@ -111,7 +122,7 @@ namespace EJ2FileManagerServices.Controllers
 
         public IList<IFormFile> UploadFiles { get; set; }
 
-        public object[] data { get; set; }
+        public FileManagerDirectoryContent[] data { get; set; }
     }
 
 }
