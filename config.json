@@ -1,6 +1,6 @@
 {
     "deploy": ["src/deploy/**"],
     "base": "src/deploy",
-    "appName" : "EJ2AureFileProvider",
+    "appName" : "EJ2ASPCoreFileProvider",
     "isServices" : true
 }
