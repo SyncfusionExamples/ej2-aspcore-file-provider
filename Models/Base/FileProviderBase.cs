@@ -31,11 +31,8 @@ namespace Syncfusion.EJ2.FileManager.Base
         FileManagerResponse Search(string path, string searchString, bool showHiddenItems, bool caseSensitive, params FileManagerDirectoryContent[] data);
 
         FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data);
-#if EJ2_DNX
-            FileManagerResponse Upload(string path, IList<System.Web.HttpPostedFileBase> uploadFiles, string action, params FileManagerDirectoryContent[] data);
-#else
+
         FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data);
-#endif
 
         FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data);
       

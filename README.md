@@ -4,7 +4,7 @@ This repository contains the ASP.NET Core file system providers for the Essentia
 
 ## Key Features
 
-A file system provider is an API for access to the physical file system in the FileManager control. It also provides the methods for performing various file actions like creating a new folder, renaming files and deleting files.
+A file system provider is an API for access to the physical file system in the FileManager control. It also provides the methods for performing various file actions like creating a new folder, renaming and deleting the files.
 
 ASP.NET Core file system provider serves the physical file system for the file manager component.
 
@@ -13,9 +13,9 @@ The following actions can be performed with ASP.NET Core file system Provider.
 - Read      - Read the files from the local file storage.
 - Details   - Gets a file's metadata which consists of Type, Size, Location and Modified date.
 - Download  - Download the selected file or folder
-- Upload    - Upload's the file. It accepts uploaded media with the following characteristics:
-                - Maximum file size:  30MB
-                - Accepted Media MIME types: */*
+- Upload    - Upload's the file. It accepts uploaded media with the following characteristics: <br />
+                - Maximum file size:  30MB <br />
+                - Accepted Media MIME types: */* <br />
 - Create    - Create a new folder.
 - Delete    - Delete a folder or file.
 - Copy      - Copies the contents of the file from the target location .
