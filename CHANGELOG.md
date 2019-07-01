@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 17.2.28-beta (2019-06-27)
 
 ### ASP.NET Core File System Provider
 
