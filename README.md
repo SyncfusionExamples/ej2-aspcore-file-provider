@@ -30,7 +30,7 @@ To run this application, you need to first clone the `ej2-aspcore-file-provider`
 To do so, open the command prompt and run the below commands one after the other.
 
 ```
-git clone https://github.com/ej2-aspcore-file-provider  ej2-aspcore-file-provider
+git clone https://github.com/SyncfusionExamples/ej2-aspcore-file-provider  ej2-aspcore-file-provider
 
 cd ej2-aspcore-file-provider
 
