@@ -15,7 +15,7 @@ The following actions can be performed with ASP.NET Core file system Provider.
 - Download  - Download the selected file or folder
 - Upload    - Upload's the file. It accepts uploaded media with the following characteristics: <br />
                 - Maximum file size:  30MB <br />
-                - Accepted Media MIME types: \*/* <br />
+                - Accepted Media MIME types: */ * <br />
 - Create    - Create a new folder.
 - Delete    - Delete a folder or file.
 - Copy      - Copies the contents of the file from the target location .
