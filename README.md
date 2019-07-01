@@ -1,4 +1,4 @@
-# ASP.NET Core service for the file manager component
+# ASP.NET Core file system  provider for the file manager component
 
 This repository contains the ASP.NET Core file system providers for the Essential JS 2 File Manager component.
 
