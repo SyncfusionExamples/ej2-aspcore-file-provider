@@ -17,6 +17,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
     {
         protected string contentRootPath;
         protected string[] allowedExtention = new string[] { "*" };
+        AccessDetails AccessDetails = new AccessDetails();
+        public string rootName;
+
 
         public PhysicalFileProvider()
         {
@@ -26,6 +29,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             this.contentRootPath = name;
         }
+
+        public void SetRules(AccessDetails details)
+        {
+            this.AccessDetails = details;
+            var root = new DirectoryInfo(this.contentRootPath);
+            this.rootName = root.Name;
+        }
+
 
         // Reads the files within the directorty
         public FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
@@ -251,12 +262,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     fileDetails.IsFile = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory;
                     fileDetails.Size = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory ? byteConversion(info.Length).ToString() : byteConversion(new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => (file.Length))).ToString();
                     fileDetails.Created = info.CreationTime;
-                    fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.FullName);
+                    fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.FullName).Substring(1);
                     fileDetails.Modified = info.LastWriteTime;
                     detailFiles = fileDetails;
                 }
                 else
                 {
+                    bool isVariousFolders = false;
+                    string previousPath = "";
+                    string previousName = "";
                     FileDetails fileDetails = new FileDetails();
                     fileDetails.Size = "0";
                     for (int i = 0; i < names.Length; i++)
@@ -272,9 +286,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         }
                         var baseDirectory = new DirectoryInfo(this.contentRootPath);
                         FileInfo info = new FileInfo(fullPath);
-                        fileDetails.Name = string.Join(", ", names);
-                        fileDetails.Size = (long.Parse(fileDetails.Size) + ((info.Attributes.ToString() != "Directory") ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
-                        fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                        fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName + ", " + data[i].Name;
+                        fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
+                        previousPath = previousPath == "" ? GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) : previousPath;
+                        if (previousPath == GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) && !isVariousFolders)
+                        {
+                            previousPath = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                            fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                        }
+                        else
+                        {
+                            isVariousFolders = true;
+                            fileDetails.Location = "Various Folders";
+                        }
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
                     fileDetails.MultipleFiles = true;
@@ -1002,19 +1026,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
                 if (names.Length == 1)
                 {
-                    var directoryName = new DirectoryInfo(contentRootPath);
-                    if (directoryName.Name != names[0])
-                    {
-                        fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    }
-                    else
-                    {
-                        fullPath = Path.Combine(contentRootPath + path);
-                    }
+                    fullPath = Path.Combine(contentRootPath + path, names[0]);
+                    var directoryName = new DirectoryInfo(fullPath);
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName = names[0] + ".zip";
+                    fileStreamResult.FileDownloadName = directoryName.Name + ".zip";
                 }
                 else
                 {

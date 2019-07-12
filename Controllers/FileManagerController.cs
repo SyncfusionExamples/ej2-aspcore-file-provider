@@ -54,7 +54,7 @@ namespace EJ2APIServices.Controllers
                 case "move":
                     return this.operation.ToCamelCase(this.operation.Move(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
                 case "details":
-                    return this.operation.ToCamelCase(this.operation.Details(args.Path, args.Names));
+                    return this.operation.ToCamelCase(this.operation.Details(args.Path, args.Names, args.Data));
                 case "create":
                     return this.operation.ToCamelCase(this.operation.Create(args.Path, args.Name));
                 case "search":
