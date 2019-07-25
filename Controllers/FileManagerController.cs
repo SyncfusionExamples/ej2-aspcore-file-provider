@@ -9,7 +9,6 @@ using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using Syncfusion.EJ2.FileManager.Base;
-using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
 
 namespace EJ2APIServices.Controllers
 {
@@ -28,11 +27,11 @@ namespace EJ2APIServices.Controllers
             this.operation.RootFolder(this.basePath + "\\" + this.root);
         }
         [Route("FileOperations")]
-        public object FileOperations([FromBody] FMParams args)
+        public object FileOperations([FromBody] FileManagerDirectoryContent args)
         {
-            if (args.action == "Remove" || args.action == "Rename")
+            if (args.Action == "delete" || args.Action == "rename")
             {
-                if ((args.targetPath == null) && (args.path == ""))
+                if ((args.TargetPath == null) && (args.Path == ""))
                 {
                     FileManagerResponse response = new FileManagerResponse();
                     ErrorDetails er = new ErrorDetails
@@ -44,24 +43,24 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(response);
                 }
             }
-            switch (args.action)
+            switch (args.Action)
             {
-                case "Read":
-                    return this.operation.ToCamelCase(this.operation.GetFiles(args.path, args.showHiddenItems));
-                case "Remove":
-                    return this.operation.ToCamelCase(this.operation.Remove(args.path, args.itemNames));
-                case "CopyTo":
-                    return this.operation.ToCamelCase(this.operation.CopyTo(args.path, args.targetPath, args.itemNames, args.renameItems));
-                case "MoveTo":
-                    return this.operation.ToCamelCase(this.operation.MoveTo(args.path, args.targetPath, args.itemNames, args.renameItems));
-                case "GetDetails":
-                    return this.operation.ToCamelCase(this.operation.GetDetails(args.path, args.itemNames));
-                case "CreateFolder":
-                    return this.operation.ToCamelCase(this.operation.CreateFolder(args.path, args.name));
-                case "Search":
-                    return this.operation.ToCamelCase(this.operation.Search(args.path, args.searchString, args.showHiddenItems, args.caseSensitive));
-                case "Rename":
-                    return this.operation.ToCamelCase(this.operation.Rename(args.path, args.name, args.itemNewName));
+                case "read":
+                    return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, args.ShowHiddenItems));
+                case "delete":
+                    return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names));
+                case "copy":
+                    return this.operation.ToCamelCase(this.operation.Copy(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
+                case "move":
+                    return this.operation.ToCamelCase(this.operation.Move(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
+                case "details":
+                    return this.operation.ToCamelCase(this.operation.Details(args.Path, args.Names, args.Data));
+                case "create":
+                    return this.operation.ToCamelCase(this.operation.Create(args.Path, args.Name));
+                case "search":
+                    return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive));
+                case "rename":
+                    return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName));
             }
             return null;
         }
@@ -69,60 +68,31 @@ namespace EJ2APIServices.Controllers
         [Route("Upload")]
         public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
         {
-            //FileManagerResponse uploadResponse;
-            //uploadResponse = operation.Upload(path, uploadFiles, action, null);
-            //if (uploadResponse.Error != null)
-            //{
-            //    Response.Clear();
-            //    Response.ContentType = "application/json; charset=utf-8";
-            //    Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
-            //    Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
-            //}
-            Response.Clear();
-            Response.ContentType = "application/json; charset=utf-8";
-            Response.StatusCode = 403;
-            Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = "File Manager's upload functionality is restricted in the online demo. If you need to test upload functionality, please install Syncfusion Essential Studio on your machine and run the demo.";
+            FileManagerResponse uploadResponse;
+            uploadResponse = operation.Upload(path, uploadFiles, action, null);
+            if (uploadResponse.Error != null)
+            {
+               Response.Clear();
+               Response.ContentType = "application/json; charset=utf-8";
+               Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
+               Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
+            }
             return Content("");
         }
 
         [Route("Download")]
         public IActionResult Download(string downloadInput)
         {
-            FMParams args = JsonConvert.DeserializeObject<FMParams>(downloadInput);
-            return operation.Download(args.path, args.itemNames);
+            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
+            return operation.Download(args.Path, args.Names);
         }
 
 
         [Route("GetImage")]
-        public IActionResult GetImage(FMParams args)
+        public IActionResult GetImage(FileManagerDirectoryContent args)
         {
-            return this.operation.GetImage(args.path,false,null, null);
+            return this.operation.GetImage(args.Path, args.Id,false,null, null);
         }       
-    }
-    public class FMParams
-    {
-        public string action { get; set; }
-
-        public string path { get; set; }
-
-        public string targetPath { get; set; }
-
-        public bool showHiddenItems { get; set; }
-
-        public string[] itemNames { get; set; }
-
-        public string name { get; set; }
-
-        public bool caseSensitive { get; set; }
-        public string[] renameItems { get; set; }
-
-        public string searchString { get; set; }
-
-        public string itemNewName { get; set; }
-
-        public IList<IFormFile> UploadFiles { get; set; }
-
-        public FileManagerDirectoryContent[] data { get; set; }
     }
 
 }
