@@ -16,17 +16,17 @@ namespace Syncfusion.EJ2.FileManager.Base
     {
 
         FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data);
-        FileManagerResponse CreateFolder(string path, string name, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data);
 
-        FileManagerResponse GetDetails(string path, string[] names, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data);
 
-        FileManagerResponse Remove(string path, string[] names, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Delete(string path, string[] names, params FileManagerDirectoryContent[] data);
 
         FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data);
 
-        FileManagerResponse CopyTo(string path, string targetPath, string[] names, string[] replacedItemNames, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Copy(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data);
 
-        FileManagerResponse MoveTo(string path, string targetPath, string[] names, string[] replacedItemNames, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data);
 
         FileManagerResponse Search(string path, string searchString, bool showHiddenItems, bool caseSensitive, params FileManagerDirectoryContent[] data);
 
@@ -37,7 +37,7 @@ namespace Syncfusion.EJ2.FileManager.Base
         FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data);
 #endif
 
-        FileStreamResult GetImage(string path, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data);
+        FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data);
       
     }
 

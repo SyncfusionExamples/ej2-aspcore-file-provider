@@ -15,9 +15,16 @@ namespace Syncfusion.EJ2.FileManager.Base
 
         public string Action { get; set; }
 
-        public string ItemNewName { get; set; }
+        public string NewName { get; set; }
 
-        public string[] ItemNames { get; set; }
+        public string[] Names { get; set; }
+
+        public string[] RenameFiles { get; set; }
+
+        public string TargetPath { get; set; }
+
+        public FileManagerDirectoryContent TargetData { get; set; }
+
         public string Name { get; set; }
 
         public long Size { get; set; }
@@ -38,6 +45,7 @@ namespace Syncfusion.EJ2.FileManager.Base
 
         public string FilterPath { get; set; }
 
+        public string FilterId { get; set; }
 
         public IList<IFormFile> UploadFiles { get; set; }
 

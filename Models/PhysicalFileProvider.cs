@@ -15,17 +15,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 {
     public class PhysicalFileProvider : PhysicalFileProviderBase
     {
-        public string contentRootPath;
-        public string[] allowedExtention = new string[] { "*" };
+        protected string contentRootPath;
+        protected string[] allowedExtention = new string[] { "*" };
 
         public PhysicalFileProvider()
         {
         }
-
+        // Sets the root path
         public void RootFolder(string name)
         {
             this.contentRootPath = name;
         }
+
+        // Reads the files within the directorty
         public FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readResponse = new FileManagerResponse();
@@ -62,7 +64,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return readResponse;
             }
         }
-
+        // Reads each file
         public virtual IEnumerable<FileManagerDirectoryContent> ReadFiles(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             try
@@ -107,7 +109,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 throw e;
             }
         }
-
+        // Gets pelative path of file or folder
         public static string GetRelativePath(string rootPath, string fullPath)
         {
             if (!String.IsNullOrEmpty(rootPath) && !String.IsNullOrEmpty(fullPath))
@@ -129,6 +131,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         }
 
 
+        // Reads child files within the directories
         public virtual IEnumerable<FileManagerDirectoryContent> ReadDirectories(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readDirectory = new FileManagerResponse();
@@ -172,7 +175,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 throw e;
             }
         }
-        public FileManagerResponse CreateFolder(string path, string name, params FileManagerDirectoryContent[] data)
+        // Creates a newFolder
+        public FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse createResponse = new FileManagerResponse();
             try
@@ -216,7 +220,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return createResponse;
             }
         }
-        public FileManagerResponse GetDetails(string path, string[] names, params FileManagerDirectoryContent[] data)
+        // Gets the details of the selected item(s).
+        public FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse getDetailResponse = new FileManagerResponse();
             FileDetails detailFiles = new FileDetails();
@@ -252,6 +257,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
                 else
                 {
+                    bool isVariousFolders = false;
+                    string previousPath = "";
+                    string previousName = "";
                     FileDetails fileDetails = new FileDetails();
                     fileDetails.Size = "0";
                     for (int i = 0; i < names.Length; i++)
@@ -267,9 +275,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         }
                         var baseDirectory = new DirectoryInfo(this.contentRootPath);
                         FileInfo info = new FileInfo(fullPath);
-                        fileDetails.Name = string.Join(", ", names);
-                        fileDetails.Size = (long.Parse(fileDetails.Size) + ((info.Attributes.ToString() != "Directory") ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
-                        fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                        fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName + ", " + data[i].Name;
+                        fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
+                        previousPath = previousPath == "" ? GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) : previousPath;
+                        if (previousPath == GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) && !isVariousFolders)
+                        {
+                            previousPath = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                            fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                        }
+                        else
+                        {
+                            isVariousFolders = true;
+                            fileDetails.Location = "Various Folders";
+                        }
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
                     fileDetails.MultipleFiles = true;
@@ -287,8 +305,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return getDetailResponse;
             }
         }
-
-        public virtual FileManagerResponse Remove(string path, string[] names, params FileManagerDirectoryContent[] data)
+        // Deletes file(s) or folder(s).
+        public virtual FileManagerResponse Delete(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
             FileManagerDirectoryContent[] removedFiles = new FileManagerDirectoryContent[names.Length];
@@ -330,7 +348,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return DeleteResponse;
             }
         }
-
+        // Renames file(s) or folder(s).
         public FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse renameResponse = new FileManagerResponse();
@@ -380,15 +398,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
-                er.Message = e.ToString();
+                er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
                 renameResponse.Error = er;
 
                 return renameResponse;
             }
         }
 
-        public FileManagerResponse CopyTo(string path, string targetPath, string[] names, string[] renamedItemNames, params FileManagerDirectoryContent[] data)
+        // Copies file(s) or folder(s).
+        public FileManagerResponse Copy(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse copyResponse = new FileManagerResponse();
             try
@@ -423,9 +442,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (exist)
                             {
                                 int index = -1;
-                                if (renamedItemNames.Length > 0)
+                                if (renameFiles.Length > 0)
                                 {
-                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(directoryName));
+                                    index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
                                 }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
@@ -459,9 +478,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (fileExist)
                             {
                                 int index = -1;
-                                if (renamedItemNames.Length > 0)
+                                if (renameFiles.Length > 0)
                                 {
-                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(fileName));
+                                    index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
                                 }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
@@ -478,7 +497,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             }
                             else
                             {
-                                if (renamedItemNames.Length > 0)
+                                if (renameFiles.Length > 0)
                                 {
                                     File.Delete(newPath);
                                 }
@@ -528,8 +547,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return copyResponse;
             }
         }
-
-        public FileManagerResponse MoveTo(string path, string targetPath, string[] names, string[] renamedItemNames, params FileManagerDirectoryContent[] data)
+        // Moves file(s) or folder(s).
+        public FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse moveResponse = new FileManagerResponse();
             try
@@ -564,9 +583,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (exist)
                             {
                                 int index = -1;
-                                if (renamedItemNames.Length > 0)
+                                if (renameFiles.Length > 0)
                                 {
-                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(directoryName));
+                                    index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
                                 }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
@@ -600,9 +619,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (fileExist)
                             {
                                 int index = -1;
-                                if (renamedItemNames.Length > 0)
+                                if (renameFiles.Length > 0)
                                 {
-                                    index = Array.FindIndex(renamedItemNames, row => row.Contains(fileName));
+                                    index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
                                 }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
@@ -667,7 +686,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return moveResponse;
             }
         }
-
+        // Search for particular file(s) or folder(s).
         public FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse searchResponse = new FileManagerResponse();
@@ -735,7 +754,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return searchResponse;
             }
         }
-
+        // Converts the bytes to definite size values
         public String byteConversion(long fileSize)
         {
             try
@@ -763,8 +782,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                               .Replace(@"\?", ".")
                        + "$";
         }
-
-        public FileStreamResult GetImage(string path, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
+        //Returns the image
+        public FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -778,7 +797,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return null;
             }
         }
-
+        // Uploads the file(s) to the files system.
         public  FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
@@ -791,7 +810,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     {
                         var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
                         var fullName = Path.Combine(this.contentRootPath + path, name);
-                        if (action == "Save")
+                        if (action == "save")
                         {
                             if (!System.IO.File.Exists(fullName))
                             {
@@ -806,7 +825,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 existFiles.Add(fullName);
                             }
                         }
-                        else if (action == "Remove")
+                        else if (action == "remove")
                         {
                             if (System.IO.File.Exists(fullName))
                             {
@@ -820,7 +839,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 uploadResponse.Error = er;
                             }
                         }
-                        else if (action == "Replace")
+                        else if (action == "replace")
                         {
                             if (System.IO.File.Exists(fullName))
                             {
@@ -832,7 +851,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 fs.Flush();
                             }
                         }
-                        else if (action == "KeepBoth")
+                        else if (action == "keepboth")
                         {
                             var newName = fullName;
                             int index = newName.LastIndexOf(".");
@@ -870,7 +889,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return uploadResponse;
             }
         }
-
+        // Download file(s) or folder(s) from the file system
         public virtual FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             try
@@ -900,7 +919,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return null;
             }
         }
-
+        // Downloads the file
         private FileStreamResult fileStreamResult;
         public virtual FileStreamResult DownloadFile(string path, string[] names = null)
         {
@@ -980,6 +999,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return null;
             }
         }
+        // Downloads the directories
         protected FileStreamResult DownloadFolder(string path, string[] names, int count)
         {
             try
@@ -995,19 +1015,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
                 if (names.Length == 1)
                 {
-                    var directoryName = new DirectoryInfo(contentRootPath);
-                    if (directoryName.Name != names[0])
-                    {
-                        fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    }
-                    else
-                    {
-                        fullPath = Path.Combine(contentRootPath + path);
-                    }
+                    fullPath = Path.Combine(contentRootPath + path, names[0]);
+                    var directoryName = new DirectoryInfo(fullPath);
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName = names[0] + ".zip";
+                    fileStreamResult.FileDownloadName = directoryName.Name + ".zip";
                 }
                 else
                 {
@@ -1063,7 +1076,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 return null;
             }
         }
-
+        // Renames a directory
         private string DirectoryRename(string newPath)
         {
             int directoryCount = 0;
@@ -1074,7 +1087,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             newPath = newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
             return newPath;
         }
-
+        // Renames a File
         private string FileRename(string newPath, string fileName)
         {
             int name = newPath.LastIndexOf(".");
@@ -1091,7 +1104,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             return newPath;
         }
 
-
+        // Copies a directory
         private void DirectoryCopy(string sourceDirName, string destDirName)
         {
             try
@@ -1127,7 +1140,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
         }
 
-
+        // Deletes a directory
         public virtual void DeleteDirectory(string path)
         {
             try
@@ -1150,6 +1163,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 throw e;
             }
         }
+        // Returns the file details
         public virtual FileManagerDirectoryContent GetFileDetails(string path)
         {
             try
