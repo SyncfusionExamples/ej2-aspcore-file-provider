@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.539
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EJ2ASPCoreFileProvider", "EJ2ASPCoreFileProvider.csproj", "{9F6F2E64-1C52-4804-8CCF-65E44EAB9927}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Syncfusion.EJ2.PhysicalFileProvider.AspNet.Core", "Syncfusion.EJ2.PhysicalFileProvider.AspNet.Core.csproj", "{9F6F2E64-1C52-4804-8CCF-65E44EAB9927}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

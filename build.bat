@@ -1,0 +1,1 @@
+gulp generate-nuget
