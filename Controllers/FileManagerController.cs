@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using Syncfusion.EJ2.FileManager.Base;
@@ -34,37 +33,41 @@ namespace EJ2APIServices.Controllers
                 if ((args.TargetPath == null) && (args.Path == ""))
                 {
                     FileManagerResponse response = new FileManagerResponse();
-                    ErrorDetails er = new ErrorDetails
-                    {
-                        Code = "401",
-                        Message = "Restricted to modify the root folder."
-                    };
-                    response.Error = er;
+                    response.Error = new ErrorDetails { Code = "401", Message = "Restricted to modify the root folder." };
                     return this.operation.ToCamelCase(response);
                 }
             }
             switch (args.Action)
             {
                 case "read":
+                    // reads the file(s) or folder(s) from the given path.
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, args.ShowHiddenItems));
                 case "delete":
+                    // deletes the selected file(s) or folder(s) from the given path.
                     return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names));
                 case "copy":
+                    // copies the selected file(s) or folder(s) from a path and then pastes them into a given target path.
                     return this.operation.ToCamelCase(this.operation.Copy(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
                 case "move":
+                    // cuts the selected file(s) or folder(s) from a path and then pastes them into a given target path.
                     return this.operation.ToCamelCase(this.operation.Move(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
                 case "details":
+                    // gets the details of the selected file(s) or folder(s).
                     return this.operation.ToCamelCase(this.operation.Details(args.Path, args.Names, args.Data));
                 case "create":
+                    // creates a new folder in a given path.
                     return this.operation.ToCamelCase(this.operation.Create(args.Path, args.Name));
                 case "search":
+                    // gets the list of file(s) or folder(s) from a given path based on the searched key string.
                     return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive));
                 case "rename":
+                    // renames a file or folder.
                     return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName));
             }
             return null;
         }
 
+        // uploads the file(s) into a specified path
         [Route("Upload")]
         public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
         {
@@ -80,6 +83,7 @@ namespace EJ2APIServices.Controllers
             return Content("");
         }
 
+        // downloads the selected file(s) and folder(s)
         [Route("Download")]
         public IActionResult Download(string downloadInput)
         {
@@ -87,7 +91,7 @@ namespace EJ2APIServices.Controllers
             return operation.Download(args.Path, args.Names);
         }
 
-
+        // gets the image(s) from the given path
         [Route("GetImage")]
         public IActionResult GetImage(FileManagerDirectoryContent args)
         {
