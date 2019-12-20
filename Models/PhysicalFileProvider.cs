@@ -17,50 +17,68 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
     {
         protected string contentRootPath;
         protected string[] allowedExtention = new string[] { "*" };
+        AccessDetails AccessDetails = new AccessDetails();
+        protected string rootName;
+        protected string hostPath;
+        protected string hostName;
+        private string accessMessage = string.Empty;
 
-        public PhysicalFileProvider()
-        {
-        }
         // Sets the root path
         public void RootFolder(string name)
         {
             this.contentRootPath = name;
+            this.hostName = new Uri(contentRootPath).Host;
+            if (!string.IsNullOrEmpty(this.hostName))
+                this.hostPath = Path.DirectorySeparatorChar + this.hostName + Path.DirectorySeparatorChar + contentRootPath.Substring((contentRootPath.ToLower().IndexOf(this.hostName) + this.hostName.Length + 1));
+        }
+
+        public void SetRules(AccessDetails details)
+        {
+            this.AccessDetails = details;
+            DirectoryInfo root = new DirectoryInfo(this.contentRootPath);
+            this.rootName = root.Name;
         }
 
         // Reads the files within the directorty
-        public FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readResponse = new FileManagerResponse();
             try
             {
-                if (path == null)
-                {
-                    path = string.Empty;
-                }
+                if (path == null) path = string.Empty;
                 String fullPath = (contentRootPath + path);
-                var directory = new DirectoryInfo(fullPath);
-                var extensions = this.allowedExtention;
+                DirectoryInfo directory = new DirectoryInfo(fullPath);
+                string[] extensions = this.allowedExtention;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
-                cwd.Name = directory.Name;
+                string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
+                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
+                cwd.Name = string.IsNullOrEmpty(this.hostPath) ? directory.Name : new DirectoryInfo(this.hostPath + path).Name;
                 cwd.Size = 0;
                 cwd.IsFile = false;
                 cwd.DateModified = directory.LastWriteTime;
                 cwd.DateCreated = directory.CreationTime;
-                cwd.HasChild = directory.GetDirectories().Length > 0 ? true : false;
+                cwd.HasChild = CheckChild(directory.FullName);
                 cwd.Type = directory.Extension;
-                cwd.FilterPath = GetRelativePath(this.contentRootPath, directory.Parent.FullName + "\\");
-                readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
+                cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
+                cwd.Permission = GetPathPermission(path);
                 readResponse.CWD = cwd;
+                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
+                {
+                    readResponse.Files = null;
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
+                }
+                readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
                 return readResponse;
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if((er.Code=="401")&&!string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 readResponse.Error = er;
-
                 return readResponse;
             }
         }
@@ -72,7 +90,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 FileManagerResponse readFiles = new FileManagerResponse();
                 if (!showHiddenItems)
                 {
-                    var files = extensions.SelectMany(directory.GetFiles).Where(f => (f.Attributes & FileAttributes.Hidden) == 0)
+                    IEnumerable<FileManagerDirectoryContent> files = extensions.SelectMany(directory.GetFiles).Where(f => (f.Attributes & FileAttributes.Hidden) == 0)
                             .Select(file => new FileManagerDirectoryContent
                             {
                                 Name = file.Name,
@@ -82,13 +100,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 DateCreated = file.CreationTime,
                                 HasChild = false,
                                 Type = file.Extension,
-                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName),
+                                Permission = GetPermission(directory.FullName, file.Name, true)
                             });
-                    readFiles.Files = (IEnumerable<FileManagerDirectoryContent>)files;
+                    readFiles.Files = files;
                 }
                 else
                 {
-                    var files = extensions.SelectMany(directory.GetFiles)
+                    IEnumerable<FileManagerDirectoryContent> files = extensions.SelectMany(directory.GetFiles)
                             .Select(file => new FileManagerDirectoryContent
                             {
                                 Name = file.Name,
@@ -98,34 +117,41 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 DateCreated = file.CreationTime,
                                 HasChild = false,
                                 Type = file.Extension,
-                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName),
+                                Permission = GetPermission(directory.FullName, file.Name, true)
                             });
                     readFiles.Files = (IEnumerable<FileManagerDirectoryContent>)files;
                 }
                 return readFiles.Files;
             }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            catch (Exception e) { throw e; }
         }
+
         // Gets pelative path of file or folder
-        public static string GetRelativePath(string rootPath, string fullPath)
+        public string GetRelativePath(string rootPath, string fullPath)
         {
             if (!String.IsNullOrEmpty(rootPath) && !String.IsNullOrEmpty(fullPath))
             {
-                var rootDirectory = new DirectoryInfo(rootPath);
-                if (rootDirectory.FullName.Substring(rootDirectory.FullName.Length - 1) == "\\")
+                DirectoryInfo rootDirectory;
+                if (!string.IsNullOrEmpty(this.hostName))
+                {
+                    if (rootPath.Contains(this.hostName) || rootPath.ToLower().Contains(this.hostName) || rootPath.ToUpper().Contains(this.hostName))
+                        rootPath = rootPath.Substring(rootPath.IndexOf(this.hostName, StringComparison.CurrentCultureIgnoreCase) + this.hostName.Length);
+                    if (fullPath.Contains(this.hostName) || fullPath.ToLower().Contains(this.hostName) || fullPath.ToUpper().Contains(this.hostName))
+                        fullPath = fullPath.Substring(fullPath.IndexOf(this.hostName, StringComparison.CurrentCultureIgnoreCase) + this.hostName.Length);
+                    rootDirectory = new DirectoryInfo(rootPath);
+                    fullPath = new DirectoryInfo(fullPath).FullName;
+                    rootPath = new DirectoryInfo(rootPath).FullName;
+                }
+                else
+                    rootDirectory = new DirectoryInfo(rootPath);
+                if (rootDirectory.FullName.Substring(rootDirectory.FullName.Length - 1) == Path.DirectorySeparatorChar.ToString())
                 {
                     if (fullPath.Contains(rootDirectory.FullName))
-                    {
                         return fullPath.Substring(rootPath.Length - 1);
-                    }
                 }
-                else if (fullPath.Contains(rootDirectory.FullName + "\\"))
-                {
-                    return "\\" + fullPath.Substring(rootPath.Length + 1);
-                }
+                else if (fullPath.Contains(rootDirectory.FullName + Path.DirectorySeparatorChar))
+                    return Path.DirectorySeparatorChar + fullPath.Substring(rootPath.Length + 1);
             }
             return String.Empty;
         }
@@ -139,7 +165,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 if (!showHiddenItems)
                 {
-                    var directories = directory.GetDirectories().Where(f => (f.Attributes & FileAttributes.Hidden) == 0)
+                    IEnumerable<FileManagerDirectoryContent> directories = directory.GetDirectories().Where(f => (f.Attributes & FileAttributes.Hidden) == 0)
                             .Select(subDirectory => new FileManagerDirectoryContent
                             {
                                 Name = subDirectory.Name,
@@ -147,47 +173,53 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 IsFile = false,
                                 DateModified = subDirectory.LastWriteTime,
                                 DateCreated = subDirectory.CreationTime,
-                                HasChild = subDirectory.GetDirectories().Length > 0 ? true : false,
+                                HasChild = CheckChild(subDirectory.FullName),
                                 Type = subDirectory.Extension,
-                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
+                                FilterPath = GetRelativePath(this.contentRootPath, directory.FullName),
+                                Permission = GetPermission(directory.FullName, subDirectory.Name, false)
                             });
-                    readDirectory.Files = (IEnumerable<FileManagerDirectoryContent>)directories;
+                    readDirectory.Files = directories;
                 }
                 else
                 {
-                    var directories = directory.GetDirectories().Select(subDirectory => new FileManagerDirectoryContent
+                    IEnumerable<FileManagerDirectoryContent> directories = directory.GetDirectories().Select(subDirectory => new FileManagerDirectoryContent
                     {
                         Name = subDirectory.Name,
                         Size = 0,
                         IsFile = false,
                         DateModified = subDirectory.LastWriteTime,
                         DateCreated = subDirectory.CreationTime,
-                        HasChild = subDirectory.GetDirectories().Length > 0 ? true : false,
+                        HasChild = CheckChild(subDirectory.FullName),
                         Type = subDirectory.Extension,
-                        FilterPath = GetRelativePath(this.contentRootPath, directory.FullName)
+                        FilterPath = GetRelativePath(this.contentRootPath, directory.FullName),
+                        Permission = GetPermission(directory.FullName, subDirectory.Name, false)
                     });
-                    readDirectory.Files = (IEnumerable<FileManagerDirectoryContent>)directories;
+                    readDirectory.Files = directories;
                 }
                 return readDirectory.Files;
             }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            catch (Exception e) { throw e; }
         }
+
         // Creates a newFolder
-        public FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse createResponse = new FileManagerResponse();
             try
             {
-                var newDirectoryPath = Path.Combine(contentRootPath + path, name);
+                AccessPermission PathPermission = GetPathPermission(path);
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
+                string newDirectoryPath = Path.Combine(contentRootPath + path, name);
 
-                var directoryExist = Directory.Exists(newDirectoryPath);
+                bool directoryExist = Directory.Exists(newDirectoryPath);
 
                 if (directoryExist)
                 {
-                    var exist = new DirectoryInfo(newDirectoryPath);
+                    DirectoryInfo exist = new DirectoryInfo(newDirectoryPath);
                     ErrorDetails er = new ErrorDetails();
                     er.Code = "400";
                     er.Message = "A file or folder with the name " + exist.Name.ToString() + " already exists.";
@@ -196,32 +228,34 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     return createResponse;
                 }
 
+                string physicalPath = GetPath(path);
                 Directory.CreateDirectory(newDirectoryPath);
-                var directory = new DirectoryInfo(newDirectoryPath);
+                DirectoryInfo directory = new DirectoryInfo(newDirectoryPath);
                 FileManagerDirectoryContent CreateData = new FileManagerDirectoryContent();
                 CreateData.Name = directory.Name;
                 CreateData.IsFile = false;
                 CreateData.Size = 0;
                 CreateData.DateModified = directory.LastWriteTime;
                 CreateData.DateCreated = directory.CreationTime;
-                CreateData.HasChild = directory.GetDirectories().Length > 0 ? true : false; ;
+                CreateData.HasChild = CheckChild(directory.FullName);
                 CreateData.Type = directory.Extension;
-                var newData = new FileManagerDirectoryContent[] { CreateData };
+                CreateData.Permission = GetPermission(physicalPath, directory.Name, false);
+                FileManagerDirectoryContent[] newData = new FileManagerDirectoryContent[] { CreateData };
                 createResponse.Files = newData;
                 return createResponse;
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 createResponse.Error = er;
-
                 return createResponse;
             }
         }
         // Gets the details of the selected item(s).
-        public FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse getDetailResponse = new FileManagerResponse();
             FileDetails detailFiles = new FileDetails();
@@ -230,29 +264,20 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names.Length == 0 || names.Length == 1)
                 {
                     if (path == null) { path = string.Empty; };
-                    var fullPath = "";
-                    if (names.Length == 0)
-                    {
-                        fullPath = (contentRootPath + path.Substring(0, path.Length - 1));
-                    }
-                    else if (names[0] == null || names[0] == "")
-                    {
-                        fullPath = (contentRootPath + path);
-                    }
-                    else
-                    {
-                        fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    }
-                    var directory = new DirectoryInfo(fullPath);
+                    string fullPath = "";
+                    fullPath = (names.Length == 0) ? (contentRootPath + path.Substring(0, path.Length - 1)) : ((names[0] == null || names[0] == "") ? (contentRootPath + path) : Path.Combine(contentRootPath + path, names[0]));
+                    string physicalPath = GetPath(path);
+                    DirectoryInfo directory = new DirectoryInfo(fullPath);
                     FileInfo info = new FileInfo(fullPath);
                     FileDetails fileDetails = new FileDetails();
-                    var baseDirectory = new DirectoryInfo(this.contentRootPath);
+                    DirectoryInfo baseDirectory = new DirectoryInfo(string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : this.hostPath);
                     fileDetails.Name = info.Name == "" ? directory.Name : info.Name;
                     fileDetails.IsFile = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory;
-                    fileDetails.Size = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory ? byteConversion(info.Length).ToString() : byteConversion(new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => (file.Length))).ToString();
+                    fileDetails.Size = (File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory ? byteConversion(info.Length).ToString() : byteConversion(GetDirectorySize(new DirectoryInfo(fullPath), 0)).ToString();
                     fileDetails.Created = info.CreationTime;
-                    fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.FullName);
+                    fileDetails.Location = GetRelativePath(string.IsNullOrEmpty(this.hostName) ? baseDirectory.Parent.FullName : baseDirectory.Parent.FullName + Path.DirectorySeparatorChar, info.FullName).Substring(1);
                     fileDetails.Modified = info.LastWriteTime;
+                    fileDetails.Permission = GetPermission(physicalPath, fileDetails.Name, fileDetails.IsFile);
                     detailFiles = fileDetails;
                 }
                 else
@@ -264,24 +289,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     fileDetails.Size = "0";
                     for (int i = 0; i < names.Length; i++)
                     {
-                        var fullPath = "";
-                        if (names[i] == null)
-                        {
-                            fullPath = (contentRootPath + path);
-                        }
-                        else
-                        {
-                            fullPath = Path.Combine(contentRootPath + path, names[i]);
-                        }
-                        var baseDirectory = new DirectoryInfo(this.contentRootPath);
+                        string fullPath = "";
+                        fullPath = (names[i] == null) ? (contentRootPath + path) : Path.Combine(contentRootPath + path, names[i]);
+                        DirectoryInfo baseDirectory = new DirectoryInfo(string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : this.hostPath);
+                        string baseDirectoryParentPath = string.IsNullOrEmpty(this.hostName) ? baseDirectory.Parent.FullName : baseDirectory.Parent.FullName + Path.DirectorySeparatorChar;
                         FileInfo info = new FileInfo(fullPath);
-                        fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName + ", " + data[i].Name;
-                        fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : new DirectoryInfo(fullPath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length))).ToString();
-                        previousPath = previousPath == "" ? GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) : previousPath;
-                        if (previousPath == GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName) && !isVariousFolders)
+                        fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName = previousName + ", " + data[i].Name;
+                        fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : GetDirectorySize(new DirectoryInfo(fullPath), 0))).ToString();
+                        previousPath = previousPath == "" ? GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) : previousPath;
+                        if (previousPath == GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) && !isVariousFolders)
                         {
-                            previousPath = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
-                            fileDetails.Location = GetRelativePath(baseDirectory.Parent.FullName, info.Directory.FullName);
+                            previousPath = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName);
+                            fileDetails.Location = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName).Substring(1);
                         }
                         else
                         {
@@ -299,8 +318,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
-                er.Message = e.ToString();
+                er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
                 getDetailResponse.Error = er;
                 return getDetailResponse;
             }
@@ -309,73 +328,115 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         public virtual FileManagerResponse Delete(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
-            FileManagerDirectoryContent[] removedFiles = new FileManagerDirectoryContent[names.Length];
+            List<FileManagerDirectoryContent> removedFiles = new List<FileManagerDirectoryContent>();
             try
             {
+                string physicalPath = GetPath(path);
+                string result = String.Empty;
                 for (int i = 0; i < names.Length; i++)
                 {
-                    var fullPath = Path.Combine((contentRootPath + path), names[i]);
-                    var directory = new DirectoryInfo(fullPath);
+                    bool IsFile = !IsDirectory(physicalPath, names[i]);
+                    AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible.  you need permission to perform the write action.");
+                    }
+                }
+                FileManagerDirectoryContent removingFile;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    string fullPath = Path.Combine((contentRootPath + path), names[i]);
+                    DirectoryInfo directory = new DirectoryInfo(fullPath);
                     if (!string.IsNullOrEmpty(names[i]))
                     {
                         FileAttributes attr = File.GetAttributes(fullPath);
-                        removedFiles[i] = GetFileDetails(fullPath);
+                        removingFile = GetFileDetails(fullPath);
                         //detect whether its a directory or file
                         if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
-                        {
-                            DeleteDirectory(fullPath);
-                        }
+                            result = DeleteDirectory(fullPath);
                         else
                         {
-                            System.IO.File.Delete(fullPath);
+                            try { File.Delete(fullPath); }
+                            catch (Exception e)
+                            {
+                                if (e.GetType().Name == "UnauthorizedAccessException")
+                                    result = fullPath;
+                                else
+                                    throw e;
+                            }
                         }
+                        if (result != String.Empty) break;
+                        removedFiles.Add(removingFile);
                     }
-                    else
-                    {
-                        throw new ArgumentNullException("name should not be null");
-                    }
+                    else throw new ArgumentNullException("name should not be null");
                 }
                 DeleteResponse.Files = removedFiles;
-                return DeleteResponse;
+                if (result != String.Empty)
+                {
+                    string deniedPath = result.Substring(this.contentRootPath.Length);
+                    ErrorDetails er = new ErrorDetails();
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible.  you need permission to perform the write action.";
+                    er.Code = "401";
+                    if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                    DeleteResponse.Error = er;
+                    return DeleteResponse;
+                }
+                else return DeleteResponse;
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 DeleteResponse.Error = er;
-
                 return DeleteResponse;
             }
         }
         // Renames file(s) or folder(s).
-        public FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse renameResponse = new FileManagerResponse();
             try
             {
-                var tempPath = (contentRootPath + path);
-                var oldPath = Path.Combine(tempPath, name);
-                var newPath = Path.Combine(tempPath, newName);
+                string physicalPath = GetPath(path);
+                bool IsFile = !IsDirectory(physicalPath, name);
+                AccessPermission permission = GetPermission(physicalPath, name, IsFile);
+                if (permission != null && (!permission.Read || !permission.Write))
+                {
+                    accessMessage = permission.Message;
+                    throw new UnauthorizedAccessException();
+                }
+                string tempPath = (contentRootPath + path);
+                string oldPath = Path.Combine(tempPath, name);
+                string newPath = Path.Combine(tempPath, newName);
                 FileAttributes attr = File.GetAttributes(oldPath);
-
                 FileInfo info = new FileInfo(oldPath);
-                var isFile = (File.GetAttributes(oldPath) & FileAttributes.Directory) != FileAttributes.Directory;
+                bool isFile = (File.GetAttributes(oldPath) & FileAttributes.Directory) != FileAttributes.Directory;
                 if (isFile)
                 {
-                    info.MoveTo(newPath);
-                }
-                else
-                {
-                    var directoryExist = Directory.Exists(newPath);
-                    if (directoryExist && !oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
+                    if (File.Exists(newPath) && !oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
                     {
-                        var exist = new DirectoryInfo(newPath);
+                        FileInfo exist = new FileInfo(newPath);
                         ErrorDetails er = new ErrorDetails();
                         er.Code = "400";
                         er.Message = "Cannot rename " + exist.Name.ToString() + " to " + newName + ": destination already exists.";
                         renameResponse.Error = er;
-
+                        return renameResponse;
+                    }
+                    info.MoveTo(newPath);
+                }
+                else
+                {
+                    bool directoryExist = Directory.Exists(newPath);
+                    if (directoryExist && !oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        DirectoryInfo exist = new DirectoryInfo(newPath);
+                        ErrorDetails er = new ErrorDetails();
+                        er.Code = "400";
+                        er.Message = "Cannot rename " + exist.Name.ToString() + " to " + newName + ": destination already exists.";
+                        renameResponse.Error = er;
                         return renameResponse;
                     }
                     else if (oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
@@ -384,136 +445,148 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         Directory.Move(oldPath, tempPath);
                         Directory.Move(tempPath, newPath);
                     }
-                    else
-                    {
-                        Directory.Move(oldPath, newPath);
-                    }
+                    else Directory.Move(oldPath, newPath);
                 }
-                var addedData = new[]{
-                        GetFileDetails(newPath)
-                    };
+                FileManagerDirectoryContent[] addedData = new[] { GetFileDetails(newPath) };
                 renameResponse.Files = addedData;
                 return renameResponse;
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(this.rootName + path + name) + "' is not accessible. You need permission to perform the write action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 renameResponse.Error = er;
-
                 return renameResponse;
             }
         }
 
         // Copies file(s) or folder(s).
-        public FileManagerResponse Copy(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Copy(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse copyResponse = new FileManagerResponse();
             try
             {
-                var existFiles = new List<string>();
-                var missingFiles = new List<string>();
-                var copiedFiles = new List<FileManagerDirectoryContent>();
-                var tempPath = path;
+                string result = String.Empty;
+                if (renameFiles == null) renameFiles = new string[0];
+                string physicalPath = GetPath(path);
                 for (int i = 0; i < names.Length; i++)
                 {
-                    var fullname = names[i];
+                    bool IsFile = !IsDirectory(physicalPath, names[i]);
+                    AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
+                    if (permission != null && (!permission.Read || !permission.Copy))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the copy action.");
+                    }
+                }
+                AccessPermission PathPermission = GetPathPermission(targetPath);
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
+                List<string> existFiles = new List<string>();
+                List<string> missingFiles = new List<string>();
+                List<FileManagerDirectoryContent> copiedFiles = new List<FileManagerDirectoryContent>();
+                string tempPath = path;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    string fullname = names[i];
                     int name = names[i].LastIndexOf("/");
                     if (name >= 0)
                     {
                         path = tempPath + names[i].Substring(0, name + 1);
                         names[i] = names[i].Substring(name + 1);
                     }
-                    else
-                    {
-                        path = tempPath;
-                    }
-                    var itemPath = Path.Combine(contentRootPath + path, names[i]);
+                    else path = tempPath;
+                    string itemPath = Path.Combine(contentRootPath + path, names[i]);
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
-                        FileAttributes fileAttributes = File.GetAttributes(itemPath);
-                        if (fileAttributes == FileAttributes.Directory)
+                        if ((File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory)
                         {
-                            var directoryName = names[i];
-                            var oldPath = Path.Combine(contentRootPath + path, directoryName);
-                            var newPath = Path.Combine(contentRootPath + targetPath, directoryName);
-                            var exist = Directory.Exists(newPath);
+                            string directoryName = names[i];
+                            string oldPath = Path.Combine(contentRootPath + path, directoryName);
+                            string newPath = Path.Combine(contentRootPath + targetPath, directoryName);
+                            bool exist = Directory.Exists(newPath);
                             if (exist)
                             {
                                 int index = -1;
                                 if (renameFiles.Length > 0)
-                                {
                                     index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
-                                }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
                                     newPath = DirectoryRename(newPath);
-                                    DirectoryCopy(oldPath, newPath);
-                                    var detail = GetFileDetails(newPath);
+                                    result = DirectoryCopy(oldPath, newPath);
+                                    if (result != String.Empty) { break; }
+                                    FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                     detail.PreviousName = names[i];
                                     copiedFiles.Add(detail);
                                 }
-                                else
-                                {
-                                    existFiles.Add(fullname);
-                                }
+                                else existFiles.Add(fullname);
                             }
                             else
                             {
-                                DirectoryCopy(oldPath, newPath);
-                                var detail = GetFileDetails(newPath);
+                                result = DirectoryCopy(oldPath, newPath);
+                                if (result != String.Empty) { break; }
+                                FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                 detail.PreviousName = names[i];
                                 copiedFiles.Add(detail);
                             }
                         }
                         else
                         {
-                            var fileName = names[i];
-                            var newFilePath = Path.Combine(targetPath, fileName);
-                            var oldPath = Path.Combine(contentRootPath + path, fileName);
-                            var newPath = Path.Combine(contentRootPath + targetPath, fileName);
-                            var fileExist = System.IO.File.Exists(newPath);
-
-                            if (fileExist)
+                            string fileName = names[i];
+                            string oldPath = Path.Combine(contentRootPath + path, fileName);
+                            string newPath = Path.Combine(contentRootPath + targetPath, fileName);
+                            bool fileExist = System.IO.File.Exists(newPath);
+                            try
                             {
-                                int index = -1;
-                                if (renameFiles.Length > 0)
+
+                                if (fileExist)
                                 {
-                                    index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
-                                }
-                                if ((newPath == oldPath) || (index != -1))
-                                {
-                                    newPath = FileRename(newPath, fileName);
-                                    File.Copy(oldPath, newPath);
-                                    var detail = GetFileDetails(newPath);
-                                    detail.PreviousName = names[i];
-                                    copiedFiles.Add(detail);
+                                    int index = -1;
+                                    if (renameFiles.Length > 0)
+                                        index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
+                                    if ((newPath == oldPath) || (index != -1))
+                                    {
+                                        newPath = FileRename(newPath, fileName);
+                                        File.Copy(oldPath, newPath);
+                                        FileManagerDirectoryContent detail = GetFileDetails(newPath);
+                                        detail.PreviousName = names[i];
+                                        copiedFiles.Add(detail);
+                                    }
+                                    else existFiles.Add(fullname);
                                 }
                                 else
                                 {
-                                    existFiles.Add(fullname);
+                                    if (renameFiles.Length > 0) File.Delete(newPath);
+                                    File.Copy(oldPath, newPath);
+                                    FileManagerDirectoryContent detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    copiedFiles.Add(detail);
                                 }
                             }
-                            else
+                            catch (Exception e)
                             {
-                                if (renameFiles.Length > 0)
-                                {
-                                    File.Delete(newPath);
-                                }
-                                File.Copy(oldPath, newPath);
-                                var detail = GetFileDetails(newPath);
-                                detail.PreviousName = names[i];
-                                copiedFiles.Add(detail);
+                                if (e.GetType().Name == "UnauthorizedAccessException") { result = newPath; break; }
+                                else throw e;
                             }
                         }
                     }
-                    else
-                    {
-                        missingFiles.Add(names[i]);
-                    }
+                    else missingFiles.Add(names[i]);
                 }
                 copyResponse.Files = copiedFiles;
+                if (result != String.Empty)
+                {
+                    string deniedPath = result.Substring(this.contentRootPath.Length);
+                    ErrorDetails er = new ErrorDetails();
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform the copy action.";
+                    er.Code = "401";
+                    copyResponse.Error = er;
+                    return copyResponse;
+                }
                 if (existFiles.Count > 0)
                 {
                     ErrorDetails er = new ErrorDetails();
@@ -522,135 +595,171 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     er.Message = "File Already Exists";
                     copyResponse.Error = er;
                 }
-                if (missingFiles.Count == 0)
-                {
-                    return copyResponse;
-                }
+                if (missingFiles.Count == 0) return copyResponse;
                 else
                 {
                     string namelist = missingFiles[0];
-                    for (int k = 1; k < missingFiles.Count; k++)
-                    {
-                        namelist = namelist + ", " + missingFiles[k];
-                    }
+                    for (int k = 1; k < missingFiles.Count; k++) { namelist = namelist + ", " + missingFiles[k]; }
                     throw new FileNotFoundException(namelist + " not found in given location.");
                 }
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 er.FileExists = copyResponse.Error?.FileExists;
                 copyResponse.Error = er;
-
                 return copyResponse;
             }
         }
+
         // Moves file(s) or folder(s).
-        public FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
-        {
+        public virtual FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
+        { 
             FileManagerResponse moveResponse = new FileManagerResponse();
             try
             {
-                var existFiles = new List<string>();
-                var missingFiles = new List<string>();
-                var movedFiles = new List<FileManagerDirectoryContent>();
-                var tempPath = path;
+                string result = String.Empty;
+                if (renameFiles == null)
+                    renameFiles = new string[0];
+                string physicalPath = GetPath(path);
                 for (int i = 0; i < names.Length; i++)
                 {
-                    var fullName = names[i];
+                    bool IsFile = !IsDirectory(physicalPath, names[i]);
+                    AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the write action.");
+                    }
+                }
+                AccessPermission PathPermission = GetPathPermission(targetPath);
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
+                List<string> existFiles = new List<string>();
+                List<string> missingFiles = new List<string>();
+                List<FileManagerDirectoryContent> movedFiles = new List<FileManagerDirectoryContent>();
+                string tempPath = path;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    string fullName = names[i];
                     int name = names[i].LastIndexOf("/");
                     if (name >= 0)
                     {
                         path = tempPath + names[i].Substring(0, name + 1);
                         names[i] = names[i].Substring(name + 1);
                     }
-                    else
-                    {
-                        path = tempPath;
-                    }
-                    var itemPath = Path.Combine(contentRootPath + path, names[i]);
+                    else path = tempPath;
+                    string itemPath = Path.Combine(contentRootPath + path, names[i]);
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
-                        FileAttributes fileAttributes = File.GetAttributes(itemPath);
-                        if (fileAttributes == FileAttributes.Directory)
+                        if ((File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory)
                         {
-                            var directoryName = names[i];
-                            var oldPath = Path.Combine(contentRootPath + path, directoryName);
-                            var newPath = Path.Combine(contentRootPath + targetPath, directoryName);
-                            var exist = Directory.Exists(newPath);
+                            string directoryName = names[i];
+                            string oldPath = Path.Combine(contentRootPath + path, directoryName);
+                            string newPath = Path.Combine(contentRootPath + targetPath, directoryName);
+                            bool exist = Directory.Exists(newPath);
                             if (exist)
                             {
                                 int index = -1;
-                                if (renameFiles.Length > 0)
-                                {
-                                    index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
-                                }
+                                if (renameFiles.Length > 0) index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
                                 if ((newPath == oldPath) || (index != -1))
                                 {
                                     newPath = DirectoryRename(newPath);
-                                    Directory.Move(oldPath, newPath);
-                                    var detail = GetFileDetails(newPath);
+                                    result = DirectoryCopy(oldPath, newPath);
+                                    if (result != String.Empty) { break; }
+                                    bool isExist = Directory.Exists(oldPath);
+                                    if (isExist)
+                                    {
+                                        result = DeleteDirectory(oldPath);
+                                        if (result != String.Empty) { break; }
+                                    }
+                                    FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                     detail.PreviousName = names[i];
                                     movedFiles.Add(detail);
                                 }
-                                else
-                                {
-                                    existFiles.Add(fullName);
-                                }
+                                else existFiles.Add(fullName);
                             }
                             else
                             {
-                                Directory.Move(oldPath, newPath);
-                                var detail = GetFileDetails(newPath);
+                                result = DirectoryCopy(oldPath, newPath);
+                                if (result != String.Empty) { break; }
+                                bool isExist = Directory.Exists(oldPath);
+                                if (isExist)
+                                {
+                                    result = DeleteDirectory(oldPath);
+                                    if (result != String.Empty) { break; }
+
+                                }
+                                FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                 detail.PreviousName = names[i];
                                 movedFiles.Add(detail);
                             }
                         }
                         else
                         {
-                            var fileName = names[i];
-                            var newFilePath = Path.Combine(targetPath, fileName);
-                            var oldPath = Path.Combine(contentRootPath + path, fileName);
-                            var newPath = Path.Combine(contentRootPath + targetPath, fileName);
-                            var fileExist = File.Exists(newPath);
-
-                            if (fileExist)
+                            string fileName = names[i];
+                            string oldPath = Path.Combine(contentRootPath + path, fileName);
+                            string newPath = Path.Combine(contentRootPath + targetPath, fileName);
+                            bool fileExist = File.Exists(newPath);
+                            try
                             {
-                                int index = -1;
-                                if (renameFiles.Length > 0)
+
+                                if (fileExist)
                                 {
-                                    index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
-                                }
-                                if ((newPath == oldPath) || (index != -1))
-                                {
-                                    newPath = FileRename(newPath, fileName);
-                                    File.Move(oldPath, newPath);
-                                    var detail = GetFileDetails(newPath);
-                                    detail.PreviousName = names[i];
-                                    movedFiles.Add(detail);
+                                    int index = -1;
+                                    if (renameFiles.Length > 0)
+                                        index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
+                                    if ((newPath == oldPath) || (index != -1))
+                                    {
+                                        newPath = FileRename(newPath, fileName);
+                                        File.Copy(oldPath, newPath);
+                                        bool isExist = File.Exists(oldPath);
+                                        if (isExist) File.Delete(oldPath);
+                                        FileManagerDirectoryContent detail = GetFileDetails(newPath);
+                                        detail.PreviousName = names[i];
+                                        movedFiles.Add(detail);
+                                    }
+                                    else existFiles.Add(fullName);
                                 }
                                 else
                                 {
-                                    existFiles.Add(fullName);
+                                    File.Copy(oldPath, newPath);
+                                    bool isExist = File.Exists(oldPath);
+                                    if (isExist) File.Delete(oldPath);
+                                    FileManagerDirectoryContent detail = GetFileDetails(newPath);
+                                    detail.PreviousName = names[i];
+                                    movedFiles.Add(detail);
                                 }
+
                             }
-                            else
+                            catch (Exception e)
                             {
-                                File.Move(oldPath, newPath);
-                                var detail = GetFileDetails(newPath);
-                                detail.PreviousName = names[i];
-                                movedFiles.Add(detail);
+                                if (e.GetType().Name == "UnauthorizedAccessException")
+                                {
+                                    result = newPath; break;
+                                }
+                                else throw e;
                             }
                         }
                     }
-                    else
-                    {
-                        missingFiles.Add(names[i]);
-                    }
+                    else missingFiles.Add(names[i]);
                 }
                 moveResponse.Files = movedFiles;
+                if (result != String.Empty)
+                {
+                    string deniedPath = result.Substring(this.contentRootPath.Length);
+                    ErrorDetails er = new ErrorDetails();
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform this action.";
+                    er.Code = "401";
+                    moveResponse.Error = er;
+                    return moveResponse;
+                }
                 if (existFiles.Count > 0)
                 {
                     ErrorDetails er = new ErrorDetails();
@@ -659,17 +768,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     er.Message = "File Already Exists";
                     moveResponse.Error = er;
                 }
-                if (missingFiles.Count == 0)
-                {
-                    return moveResponse;
-                }
+                if (missingFiles.Count == 0) return moveResponse;
                 else
                 {
                     string namelist = missingFiles[0];
-                    for (int k = 1; k < missingFiles.Count; k++)
-                    {
-                        namelist = namelist + ", " + missingFiles[k];
-                    }
+                    for (int k = 1; k < missingFiles.Count; k++) { namelist = namelist + ", " + missingFiles[k]; }
                     throw new FileNotFoundException(namelist + " not found in given location.");
                 }
             }
@@ -677,68 +780,86 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails
                 {
-                    Code = "404",
                     Message = e.Message.ToString(),
+                    Code = e.Message.ToString().Contains("is not accessible. You need permission") ? "401" : "417",
                     FileExists = moveResponse.Error?.FileExists
-
-                };
+                }; 
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 moveResponse.Error = er;
                 return moveResponse;
             }
         }
+
         // Search for particular file(s) or folder(s).
-        public FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse searchResponse = new FileManagerResponse();
             try
             {
                 if (path == null) { path = string.Empty; };
-
-                var searchWord = searchString;
-                var searchPath = (this.contentRootPath + path);
-                var directory = new DirectoryInfo((this.contentRootPath + path));
+                string searchWord = searchString;
+                string searchPath = (this.contentRootPath + path);
+                DirectoryInfo directory = new DirectoryInfo(this.contentRootPath + path);
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 cwd.Name = directory.Name;
                 cwd.Size = 0;
                 cwd.IsFile = false;
                 cwd.DateModified = directory.LastWriteTime;
                 cwd.DateCreated = directory.CreationTime;
-                cwd.HasChild = directory.GetDirectories().Length > 0 ? true : false;
+                string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
+                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
+                cwd.HasChild = CheckChild(directory.FullName);
                 cwd.Type = directory.Extension;
-                cwd.FilterPath = GetRelativePath(this.contentRootPath, directory.Parent.FullName + "\\");
+                cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
+                cwd.Permission = GetPathPermission(path);
+                if (cwd.Permission != null && !cwd.Permission.Read)
+                {
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the read action.");
+                }
                 searchResponse.CWD = cwd;
 
                 List<FileManagerDirectoryContent> foundedFiles = new List<FileManagerDirectoryContent>();
-                var extensions = this.allowedExtention;
-                var searchDirectory = new DirectoryInfo(searchPath);
+                string[] extensions = this.allowedExtention;
+                DirectoryInfo searchDirectory = new DirectoryInfo(searchPath);
+                List<FileInfo> files = new List<FileInfo>();
+                List<DirectoryInfo> directories = new List<DirectoryInfo>();
                 if (showHiddenItems)
                 {
-                    var filteredFileList = searchDirectory.GetFiles(searchString, SearchOption.AllDirectories).
+                    IEnumerable<FileInfo> filteredFileList = GetDirectoryFiles(searchDirectory, files).
                         Where(item => new Regex(WildcardToRegex(searchString), (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase)).IsMatch(item.Name));
-                    var filteredDirectoryList = searchDirectory.GetDirectories(searchString, SearchOption.AllDirectories).
+                    IEnumerable<DirectoryInfo> filteredDirectoryList = GetDirectoryFolders(searchDirectory, directories).
                         Where(item => new Regex(WildcardToRegex(searchString), (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase)).IsMatch(item.Name));
                     foreach (FileInfo file in filteredFileList)
                     {
-                        foundedFiles.Add(GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name)));
+                        FileManagerDirectoryContent fileDetails = GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name));
+                        bool hasPermission = parentsHavePermission(fileDetails);
+                        if (hasPermission) foundedFiles.Add(fileDetails);
                     }
                     foreach (DirectoryInfo dir in filteredDirectoryList)
                     {
-                        foundedFiles.Add(GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName)));
+                        FileManagerDirectoryContent dirDetails = GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName));
+                        bool hasPermission = parentsHavePermission(dirDetails);
+                        if (hasPermission) foundedFiles.Add(dirDetails);
                     }
                 }
                 else
                 {
-                    var filteredFileList = searchDirectory.GetFiles(searchString, SearchOption.AllDirectories).
-                        Where(item => new Regex(WildcardToRegex(searchString), (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase)).IsMatch(item.Name) && (item.Attributes & FileAttributes.Hidden) == 0);
-                    var filteredDirectoryList = searchDirectory.GetDirectories(searchString, SearchOption.AllDirectories).
+                    IEnumerable<FileInfo> filteredFileList = GetDirectoryFiles(searchDirectory, files).
+                       Where(item => new Regex(WildcardToRegex(searchString), (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase)).IsMatch(item.Name) && (item.Attributes & FileAttributes.Hidden) == 0);
+                    IEnumerable<DirectoryInfo> filteredDirectoryList = GetDirectoryFolders(searchDirectory, directories).
                         Where(item => new Regex(WildcardToRegex(searchString), (caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase)).IsMatch(item.Name) && (item.Attributes & FileAttributes.Hidden) == 0);
                     foreach (FileInfo file in filteredFileList)
                     {
-                        foundedFiles.Add(GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name)));
+                        FileManagerDirectoryContent fileDetails = GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name));
+                        bool hasPermission = parentsHavePermission(fileDetails);
+                        if (hasPermission) foundedFiles.Add(fileDetails);
                     }
                     foreach (DirectoryInfo dir in filteredDirectoryList)
                     {
-                        foundedFiles.Add(GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName)));
+                        FileManagerDirectoryContent dirDetails = GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName));
+                        bool hasPermission = parentsHavePermission(dirDetails);
+                        if (hasPermission) foundedFiles.Add(dirDetails);
                     }
                 }
                 searchResponse.Files = (IEnumerable<FileManagerDirectoryContent>)foundedFiles;
@@ -747,10 +868,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Code = "404";
                 er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 searchResponse.Error = er;
-
                 return searchResponse;
             }
         }
@@ -760,77 +881,63 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             try
             {
                 string[] index = { "B", "KB", "MB", "GB", "TB", "PB", "EB" }; //Longs run out around EB
-                if (fileSize == 0)
-                {
-                    return "0 " + index[0];
-                }
-
-                long bytes = Math.Abs(fileSize);
-                int loc = Convert.ToInt32(Math.Floor(Math.Log(bytes, 1024)));
-                double num = Math.Round(bytes / Math.Pow(1024, loc), 1);
-                return (Math.Sign(fileSize) * num).ToString() + " " + index[loc];
+                if (fileSize == 0) return "0 " + index[0];
+                int loc = Convert.ToInt32(Math.Floor(Math.Log((Math.Abs(fileSize)), 1024)));
+                return (Math.Sign(fileSize) * (Math.Round((Math.Abs(fileSize)) / Math.Pow(1024, loc), 1))).ToString() + " " + index[loc];
             }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            catch (Exception e) { throw e; }
         }
         public virtual string WildcardToRegex(string pattern)
         {
-            return "^" + Regex.Escape(pattern)
-                              .Replace(@"\*", ".*")
-                              .Replace(@"\?", ".")
-                       + "$";
+            return "^" + Regex.Escape(pattern).Replace(@"\*", ".*").Replace(@"\?", ".") + "$";
         }
         //Returns the image
-        public FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
+        public virtual FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
             try
             {
+                AccessPermission PathPermission = GetFilePermission(path);
+                if (PathPermission != null && !PathPermission.Read)
+                    return null;
                 String fullPath = (contentRootPath + path);
                 FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                 FileStreamResult fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                 return fileStreamResult;
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch (Exception) { return null; }
         }
+
         // Uploads the file(s) to the files system.
-        public  FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
             try
             {
-                var existFiles = new List<string>();
-                foreach (var file in uploadFiles)
+                AccessPermission PathPermission = GetPathPermission(path);
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.Upload))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the upload action.");
+                }
+                List<string> existFiles = new List<string>();
+                foreach (IFormFile file in uploadFiles)
                 {
                     if (uploadFiles != null)
                     {
-                        var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
-                        var fullName = Path.Combine(this.contentRootPath + path, name);
+                        string name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+                        string fullName = Path.Combine((this.contentRootPath + path), name);
                         if (action == "save")
                         {
                             if (!System.IO.File.Exists(fullName))
                             {
-                                using (FileStream fs = System.IO.File.Create(fullName))
-                                {
-                                    file.CopyTo(fs);
-                                    fs.Flush();
-                                }
+                                using (FileStream fs = System.IO.File.Create(fullName)) { file.CopyTo(fs); fs.Flush(); }
                             }
-                            else
-                            {
-                                existFiles.Add(fullName);
-                            }
+                            else existFiles.Add(fullName);
                         }
                         else if (action == "remove")
                         {
                             if (System.IO.File.Exists(fullName))
-                            {
                                 System.IO.File.Delete(fullName);
-                            }
                             else
                             {
                                 ErrorDetails er = new ErrorDetails();
@@ -842,32 +949,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         else if (action == "replace")
                         {
                             if (System.IO.File.Exists(fullName))
-                            {
                                 System.IO.File.Delete(fullName);
-                            }
-                            using (FileStream fs = System.IO.File.Create(fullName))
-                            {
-                                file.CopyTo(fs);
-                                fs.Flush();
-                            }
+                            using (FileStream fs = System.IO.File.Create(fullName)) { file.CopyTo(fs); fs.Flush(); }
                         }
                         else if (action == "keepboth")
                         {
-                            var newName = fullName;
+                            string newName = fullName;
                             int index = newName.LastIndexOf(".");
                             if (index >= 0)
                                 newName = newName.Substring(0, index);
                             int fileCount = 0;
-                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
-                            {
-                                fileCount++;
-                            }
+                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name)))) { fileCount++; }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
-                            using (FileStream fs = System.IO.File.Create(newName))
-                            {
-                                file.CopyTo(fs);
-                                fs.Flush();
-                            }
+                            using (FileStream fs = System.IO.File.Create(newName)) { file.CopyTo(fs); fs.Flush(); }
                         }
                     }
                 }
@@ -884,7 +978,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = e.Message.ToString();
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(path) + "' is not accessible. You need permission to perform the upload action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
             }
@@ -894,30 +990,23 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             try
             {
+                string physicalPath = GetPath(path);
                 String fullPath;
                 int count = 0;
-                for (var i = 0; i < names.Length; i++)
+                for (int i = 0; i < names.Length; i++)
                 {
+                    bool IsFile = !IsDirectory(physicalPath, names[i]);
+                    AccessPermission FilePermission = GetPermission(physicalPath, names[i], IsFile);
+                    if (FilePermission != null && (!FilePermission.Read || !FilePermission.Download))
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the download action.");
+
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
-                    FileAttributes fileAttributes = File.GetAttributes(fullPath);
-                    if (fileAttributes != FileAttributes.Directory)
-                    {
+                    if ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory)
                         count++;
-                    }
                 }
-                if (count == names.Length)
-                {
-                    return DownloadFile(path, names);
-                }
-                else
-                {
-                    return DownloadFolder(path, names, count);
-                }
+                return (count == names.Length) ? DownloadFile(path, names) : DownloadFolder(path, names, count);
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch (Exception) { return null; }
         }
         // Downloads the file
         private FileStreamResult fileStreamResult;
@@ -926,7 +1015,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             try
             {
                 path = Path.GetDirectoryName(path);
-                var tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
+                string tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
                 String fullPath;
                 if (names == null || names.Length == 0)
                 {
@@ -948,9 +1037,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     string newFileName = fileName.Substring(36);
                     tempPath = Path.Combine(Path.GetTempPath(), newFileName);
                     if (System.IO.File.Exists(tempPath))
-                    {
                         System.IO.File.Delete(tempPath);
-                    }
                     string currentDirectory;
                     ZipArchiveEntry zipEntry;
                     ZipArchive archive;
@@ -967,15 +1054,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                     zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
                                 }
                             }
-                            catch (Exception)
-                            {
-                                return null;
-                            }
+                            catch (Exception) { return null; }
                         }
-                        else
-                        {
-                            throw new ArgumentNullException("name should not be null");
-                        }
+                        else throw new ArgumentNullException("name should not be null");
                     }
                     try
                     {
@@ -983,40 +1064,31 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                         fileStreamResult.FileDownloadName = "files.zip";
                     }
-                    catch (Exception)
-                    {
-                        return null;
-                    }
+                    catch (Exception) { return null; }
                 }
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
                 return fileStreamResult;
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch (Exception) { return null; }
         }
         // Downloads the directories
         protected FileStreamResult DownloadFolder(string path, string[] names, int count)
         {
             try
             {
-                path = Path.GetDirectoryName(path);
+                if (!String.IsNullOrEmpty(path))
+                    path = Path.GetDirectoryName(path);
                 FileStreamResult fileStreamResult;
                 // create a temp.Zip file intially 
-                var tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
+                string tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
                 String fullPath;
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
                 if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    var directoryName = new DirectoryInfo(fullPath);
+                    DirectoryInfo directoryName = new DirectoryInfo(fullPath);
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
@@ -1029,36 +1101,29 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     ZipArchive archive;
                     using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                     {
-                        for (var i = 0; i < names.Length; i++)
+                        for (int i = 0; i < names.Length; i++)
                         {
                             currentDirectory = Path.Combine((contentRootPath + path), names[i]);
-                            FileAttributes fileAttributes = File.GetAttributes(currentDirectory);
-                            if (fileAttributes == FileAttributes.Directory)
+                            if ((File.GetAttributes(currentDirectory) & FileAttributes.Directory) == FileAttributes.Directory)
                             {
-                                var files = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
+                                string[] files = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
                                 if (files.Length == 0)
-                                {
                                     zipEntry = archive.CreateEntry(names[i] + "/");
-                                }
                                 else
                                 {
-                                    foreach (var filePath in files)
+                                    foreach (string filePath in files)
                                     {
                                         zipEntry = archive.CreateEntryFromFile(filePath, names[i] + filePath.Substring(currentDirectory.Length), CompressionLevel.Fastest);
                                     }
                                 }
-                                foreach (var filePath in Directory.GetDirectories(currentDirectory, "*", SearchOption.AllDirectories))
+                                foreach (string filePath in Directory.GetDirectories(currentDirectory, "*", SearchOption.AllDirectories))
                                 {
                                     if (Directory.GetFiles(filePath).Length == 0)
-                                    {
                                         zipEntry = archive.CreateEntry(names[i] + filePath.Substring(currentDirectory.Length) + "/");
-                                    }
                                 }
                             }
                             else
-                            {
                                 zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
-                            }
                         }
                     }
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
@@ -1066,101 +1131,113 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     fileStreamResult.FileDownloadName = "folders.zip";
                 }
                 if (File.Exists(tempPath))
-                {
                     File.Delete(tempPath);
-                }
                 return fileStreamResult;
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            catch (Exception) { return null; }
         }
         // Renames a directory
         private string DirectoryRename(string newPath)
         {
             int directoryCount = 0;
-            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "")))
-            {
-                directoryCount++;
-            }
-            newPath = newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
-            return newPath;
+            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : ""))) { directoryCount++; }
+            return newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
         }
         // Renames a File
         private string FileRename(string newPath, string fileName)
         {
             int name = newPath.LastIndexOf(".");
-            if (name >= 0)
-            {
-                newPath = newPath.Substring(0, name);
-            }
+            if (name >= 0) newPath = newPath.Substring(0, name);
             int fileCount = 0;
-            while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName))))
-            {
-                fileCount++;
-            }
-            newPath = newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
-            return newPath;
+            while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName)))) { fileCount++; }
+            return newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
         }
 
         // Copies a directory
-        private void DirectoryCopy(string sourceDirName, string destDirName)
+        private string DirectoryCopy(string sourceDirName, string destDirName)
         {
+            string result = String.Empty;
             try
             {
                 // Gets the subdirectories for the specified directory.
-                var dir = new DirectoryInfo(sourceDirName);
+                DirectoryInfo dir = new DirectoryInfo(sourceDirName);
 
-                var dirs = dir.GetDirectories();
+                DirectoryInfo[] dirs = dir.GetDirectories();
                 // If the destination directory doesn't exist, creates it.
                 if (!Directory.Exists(destDirName))
                 {
-                    Directory.CreateDirectory(destDirName);
+                    try { Directory.CreateDirectory(destDirName); }
+                    catch (Exception e)
+                    {
+                        if (e.GetType().Name == "UnauthorizedAccessException") return destDirName;
+                        else throw e;
+                    }
                 }
 
                 // Gets the files in the directory and copy them to the new location.
-                var files = dir.GetFiles();
-                foreach (var file in files)
+                FileInfo[] files = dir.GetFiles();
+                foreach (FileInfo file in files)
                 {
-                    var oldPath = Path.Combine(sourceDirName, file.Name);
-                    var temppath = Path.Combine(destDirName, file.Name);
-                    File.Copy(oldPath, temppath);
+                    try
+                    {
+                        string oldPath = Path.Combine(sourceDirName, file.Name);
+                        string temppath = Path.Combine(destDirName, file.Name);
+                        File.Copy(oldPath, temppath);
+                    }
+                    catch (Exception e)
+                    {
+                        if (e.GetType().Name == "UnauthorizedAccessException") return file.FullName;
+                        else throw e;
+                    }
                 }
-                foreach (var direc in dirs)
+                foreach (DirectoryInfo direc in dirs)
                 {
-                    var oldPath = Path.Combine(sourceDirName, direc.Name);
-                    var temppath = Path.Combine(destDirName, direc.Name);
-                    DirectoryCopy(oldPath, temppath);
+                    result = DirectoryCopy(Path.Combine(sourceDirName, direc.Name), Path.Combine(destDirName, direc.Name));
+                    if (result != String.Empty) return result;
                 }
+                return result;
             }
             catch (Exception e)
             {
-                throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException") return sourceDirName;
+                else throw e;
             }
         }
 
         // Deletes a directory
-        public virtual void DeleteDirectory(string path)
+        public virtual string DeleteDirectory(string path)
         {
             try
             {
+                string result = String.Empty;
                 string[] files = Directory.GetFiles(path);
                 string[] dirs = Directory.GetDirectories(path);
                 foreach (string file in files)
                 {
-                    File.SetAttributes(file, FileAttributes.Normal);
-                    File.Delete(file);
+                    try
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
+                    }
+                    catch (Exception e)
+                    {
+                        if (e.GetType().Name == "UnauthorizedAccessException") return file;
+                        else throw e;
+                    }
                 }
                 foreach (string dir in dirs)
                 {
-                    DeleteDirectory(dir);
+                    result = DeleteDirectory(dir);
+                    if (result != String.Empty)
+                        return result;
                 }
                 Directory.Delete(path, true);
+                return result;
             }
-            catch (IOException e)
+            catch (Exception e)
             {
-                throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException") return path;
+                else throw e;
             }
         }
         // Returns the file details
@@ -1171,12 +1248,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 FileInfo info = new FileInfo(path);
                 FileAttributes attr = File.GetAttributes(path);
                 FileInfo detailPath = new FileInfo(info.FullName);
-                var folderLength = 0;
-                var isFile = ((attr & FileAttributes.Directory) == FileAttributes.Directory) ? false : true;
-                if (!isFile)
-                {
-                    folderLength = detailPath.Directory.GetDirectories().Length;
-                }
+                int folderLength = 0;
+                bool isFile = ((attr & FileAttributes.Directory) == FileAttributes.Directory) ? false : true;
+                if (!isFile) folderLength = detailPath.Directory.GetDirectories().Length;
+                string filterPath = GetRelativePath(this.contentRootPath, info.DirectoryName + Path.DirectorySeparatorChar);
                 return new FileManagerDirectoryContent
                 {
                     Name = info.Name,
@@ -1185,24 +1260,236 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     DateModified = info.LastWriteTime,
                     DateCreated = info.CreationTime,
                     Type = info.Extension,
-                    HasChild = isFile ? false : (info.Directory.GetDirectories().Length > 0 ? true : false),
-                    FilterPath = GetRelativePath(this.contentRootPath, info.DirectoryName + "\\")
+                    HasChild = isFile ? false : (CheckChild(info.FullName)),
+                    FilterPath = filterPath,
+                    Permission = GetPermission(GetPath(filterPath), info.Name, isFile)
                 };
             }
-            catch (Exception e)
+            catch (Exception e) { throw e; }
+        }
+        public virtual AccessPermission GetPermission(string location, string name, bool isFile)
+        {
+            AccessPermission FilePermission = new AccessPermission();
+            if (isFile)
             {
-                throw e;
+                if (this.AccessDetails.AccessRules == null) return null;
+                string nameExtension = Path.GetExtension(name).ToLower();
+                string fileName = Path.GetFileNameWithoutExtension(name);
+                string currentPath = GetFilePath(location + name);
+                foreach (AccessRule fileRule in AccessDetails.AccessRules)
+                {
+                    if (!string.IsNullOrEmpty(fileRule.Path) && fileRule.IsFile && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
+                    {
+                        if (fileRule.Path.IndexOf("*.*") > -1)
+                        {
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*.*"));
+                            if (currentPath.IndexOf(GetPath(parentPath)) == 0 || parentPath == "")
+                                FilePermission = UpdateFileRules(FilePermission, fileRule);
+                        }
+                        else if (fileRule.Path.IndexOf("*.") > -1)
+                        {
+                            string pathExtension = Path.GetExtension(fileRule.Path).ToLower();
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*."));
+                            if ((GetPath(parentPath) == currentPath || parentPath == "") && nameExtension == pathExtension)
+                                FilePermission = UpdateFileRules(FilePermission, fileRule);
+                        }
+                        else if (fileRule.Path.IndexOf(".*") > -1)
+                        {
+                            string pathName = Path.GetFileNameWithoutExtension(fileRule.Path);
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf(pathName + ".*"));
+                            if ((GetPath(parentPath) == currentPath || parentPath == "") && fileName == pathName)
+                                FilePermission = UpdateFileRules(FilePermission, fileRule);
+                        }
+                        else if (GetPath(fileRule.Path) == GetValidPath(location + name))
+                            FilePermission = UpdateFileRules(FilePermission, fileRule);
+                    }
+                }
+                return FilePermission;
             }
+            else
+            {
+                if (this.AccessDetails.AccessRules == null) { return null; }
+                foreach (AccessRule folderRule in AccessDetails.AccessRules)
+                {
+                    if (folderRule.Path != null && folderRule.IsFile == false && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
+                    {
+                        if (folderRule.Path.IndexOf("*") > -1)
+                        {
+                            string parentPath = folderRule.Path.Substring(0, folderRule.Path.IndexOf("*"));
+                            if (GetValidPath(location + name).IndexOf(GetPath(parentPath)) == 0 || parentPath == "")
+                                FilePermission = UpdateFolderRules(FilePermission, folderRule);
+                        }
+                        else if (GetPath(folderRule.Path) == GetValidPath(location + name) || GetPath(folderRule.Path) == GetValidPath(location + name + Path.DirectorySeparatorChar))
+                            FilePermission = UpdateFolderRules(FilePermission, folderRule);
+                        else if (GetValidPath(location + name).IndexOf(GetPath(folderRule.Path)) == 0)
+                        {
+                            FilePermission.Write = HasPermission(folderRule.WriteContents);
+                            FilePermission.WriteContents = HasPermission(folderRule.WriteContents);
+                        }
+                    }
+                }
+                return FilePermission;
+            }
+        }
+        public virtual string GetPath(string path)
+        {
+            String fullPath = (this.contentRootPath + path);
+            DirectoryInfo directory = new DirectoryInfo(fullPath);
+            return directory.FullName;
+        }
+        public virtual string GetValidPath(string path)
+        {
+            DirectoryInfo directory = new DirectoryInfo(path);
+            return directory.FullName;
+        }
+        public virtual string GetFilePath(string path)
+        {
+            return Path.GetDirectoryName(path) + Path.DirectorySeparatorChar;
+        }
+        public virtual string[] GetFolderDetails(string path)
+        {
+            string[] str_array = path.Split('/'), fileDetails = new string[2];
+            string parentPath = "";
+            for (int i = 0; i < str_array.Length - 2; i++) { parentPath += str_array[i] + "/"; }
+            fileDetails[0] = parentPath;
+            fileDetails[1] = str_array[str_array.Length - 2];
+            return fileDetails;
+        }
+        public virtual AccessPermission GetPathPermission(string path)
+        {
+            string[] fileDetails = GetFolderDetails(path);
+            return GetPermission(GetPath(fileDetails[0]), fileDetails[1], false);
+        }
+        public virtual AccessPermission GetFilePermission(string path)
+        {
+            string parentPath = path.Substring(0, path.LastIndexOf("/") + 1);
+            string fileName = Path.GetFileName(path);
+            return GetPermission(GetPath(parentPath), fileName, true);
+        }
+        public virtual bool IsDirectory(string path, string fileName)
+        {
+            String fullPath = Path.Combine(path, fileName);
+            return ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
+        }
+        public virtual bool HasPermission(Permission rule)
+        {
+            return rule == Permission.Allow ? true : false;
+        }
+        public virtual AccessPermission UpdateFileRules(AccessPermission filePermission, AccessRule fileRule)
+        {
+            filePermission.Copy = HasPermission(fileRule.Copy);
+            filePermission.Download = HasPermission(fileRule.Download);
+            filePermission.Write = HasPermission(fileRule.Write);
+            filePermission.Read = HasPermission(fileRule.Read);
+            filePermission.Message = string.IsNullOrEmpty(fileRule.Message)?string.Empty:fileRule.Message;
+            return filePermission;
+        }
+        public virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, AccessRule folderRule)
+        {
+            folderPermission.Copy = HasPermission(folderRule.Copy);
+            folderPermission.Download = HasPermission(folderRule.Download);
+            folderPermission.Write = HasPermission(folderRule.Write);
+            folderPermission.WriteContents = HasPermission(folderRule.WriteContents);
+            folderPermission.Read = HasPermission(folderRule.Read);
+            folderPermission.Upload = HasPermission(folderRule.Upload);
+            folderPermission.Message = string.IsNullOrEmpty(folderRule.Message) ? string.Empty : folderRule.Message;
+            return folderPermission;
+        }
+        public virtual bool parentsHavePermission(FileManagerDirectoryContent fileDetails)
+        {
+            String parentPath = fileDetails.FilterPath.Replace(Path.DirectorySeparatorChar, '/');
+            String[] parents = parentPath.Split('/');
+            String currPath = "/";
+            bool hasPermission = true;
+            for (int i = 0; i <= parents.Length - 2; i++)
+            {
+                currPath = (parents[i] == "") ? currPath : (currPath + parents[i] + "/");
+                AccessPermission PathPermission = GetPathPermission(currPath);
+                if (PathPermission == null) break;
+                else if (PathPermission != null && !PathPermission.Read)
+                {
+                    hasPermission = false;
+                    break;
+                }
+            }
+            return hasPermission;
         }
         public string ToCamelCase(FileManagerResponse userData)
         {
-            return JsonConvert.SerializeObject(userData, new JsonSerializerSettings
+            return JsonConvert.SerializeObject(userData, new JsonSerializerSettings { ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() } });
+        }
+        private string getFileNameFromPath(string path)
+        {
+            int index = path.LastIndexOf("/");
+            return path.Substring(index + 1);
+        }
+        private bool CheckChild(string path)
+        {
+            bool hasChild;
+            try
             {
-                ContractResolver = new DefaultContractResolver
-                {
-                    NamingStrategy = new CamelCaseNamingStrategy()
-                }
-            });
+                DirectoryInfo directory = new DirectoryInfo(path);
+                DirectoryInfo[] dir = directory.GetDirectories();
+                hasChild = dir.Length != 0;
+            }
+            catch (Exception e)
+            {
+                if (e.GetType().Name == "UnauthorizedAccessException") hasChild = false;
+                else throw e;
+            }
+            return hasChild;
+        }
+        private bool hasAccess(string path)
+        {
+            bool hasAcceess;
+            try
+            {
+                DirectoryInfo directory = new DirectoryInfo(path);
+                DirectoryInfo[] dir = directory.GetDirectories();
+                hasAcceess = dir != null;
+            }
+            catch (Exception e)
+            {
+                if (e.GetType().Name == "UnauthorizedAccessException") hasAcceess = false;
+                else throw e;
+            }
+            return hasAcceess;
+        }
+        private long GetDirectorySize(DirectoryInfo dir, long size)
+        {
+            try
+            {
+                foreach (DirectoryInfo subdir in dir.GetDirectories()) { size = GetDirectorySize(subdir, size); }
+                foreach (FileInfo file in dir.GetFiles()) { size += file.Length; }
+            }
+            catch (Exception e)
+            {
+                if (e.GetType().Name != "UnauthorizedAccessException") throw e;
+            }
+            return size;
+        }
+        private List<FileInfo> GetDirectoryFiles(DirectoryInfo dir, List<FileInfo> files)
+        {
+            try
+            {
+                foreach (DirectoryInfo subdir in dir.GetDirectories()) { files = GetDirectoryFiles(subdir, files); }
+                foreach (FileInfo file in dir.GetFiles()) { files.Add(file); }
+            }
+            catch (Exception e)
+            {
+                if (e.GetType().Name != "UnauthorizedAccessException") throw e;
+            }
+            return files;
+        }
+        private List<DirectoryInfo> GetDirectoryFolders(DirectoryInfo dir, List<DirectoryInfo> files)
+        {
+            try
+            {
+                foreach (DirectoryInfo subdir in dir.GetDirectories()) { files = GetDirectoryFolders(subdir, files); }
+                foreach (DirectoryInfo file in dir.GetDirectories()) { files.Add(file); }
+            }
+            catch (Exception e) { if (e.GetType().Name != "UnauthorizedAccessException") throw e; }
+            return files;
         }
     }
 }
