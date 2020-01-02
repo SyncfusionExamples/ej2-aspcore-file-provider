@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 17.4.40 (2019-12-24)
 
 ### File Manager
 
