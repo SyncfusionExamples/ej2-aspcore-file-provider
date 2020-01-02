@@ -21,6 +21,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string rootName;
         protected string hostPath;
         protected string hostName;
+        private string accessMessage = string.Empty;
 
         // Sets the root path
         public void RootFolder(string name)
@@ -64,7 +65,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
                 {
                     readResponse.Files = null;
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
                 }
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
@@ -74,7 +76,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if((er.Code=="401")&&!string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 readResponse.Error = er;
                 return readResponse;
             }
@@ -205,9 +208,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             try
             {
                 AccessPermission PathPermission = GetPathPermission(path);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
-
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
                 string newDirectoryPath = Path.Combine(contentRootPath + path, name);
 
                 bool directoryExist = Directory.Exists(newDirectoryPath);
@@ -243,7 +248,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 createResponse.Error = er;
                 return createResponse;
             }
@@ -313,7 +319,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
                 getDetailResponse.Error = er;
                 return getDetailResponse;
             }
@@ -331,8 +337,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
-                    if (permission != null && (!permission.Read || !permission.Edit))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible.  you need permission to perform the write action.");
+                    }
                 }
                 FileManagerDirectoryContent removingFile;
                 for (int i = 0; i < names.Length; i++)
@@ -367,8 +376,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible.  you need permission to perform the write action.";
                     er.Code = "401";
+                    if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                     DeleteResponse.Error = er;
                     return DeleteResponse;
                 }
@@ -378,7 +388,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 DeleteResponse.Error = er;
                 return DeleteResponse;
             }
@@ -392,8 +403,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string physicalPath = GetPath(path);
                 bool IsFile = !IsDirectory(physicalPath, name);
                 AccessPermission permission = GetPermission(physicalPath, name, IsFile);
-                if (permission != null && (!permission.Read || !permission.Edit))
+                if (permission != null && (!permission.Read || !permission.Write))
+                {
+                    accessMessage = permission.Message;
                     throw new UnauthorizedAccessException();
+                }
                 string tempPath = (contentRootPath + path);
                 string oldPath = Path.Combine(tempPath, name);
                 string newPath = Path.Combine(tempPath, newName);
@@ -440,8 +454,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.rootName + path + name + "' is not accessible. Access is denied." : e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(this.rootName + path + name) + "' is not accessible. You need permission to perform the write action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 renameResponse.Error = er;
                 return renameResponse;
             }
@@ -461,11 +476,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
                     if (permission != null && (!permission.Read || !permission.Copy))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the copy action.");
+                    }
                 }
                 AccessPermission PathPermission = GetPathPermission(targetPath);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + targetPath + "' is not accessible. Access is denied.");
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
                 List<string> existFiles = new List<string>();
                 List<string> missingFiles = new List<string>();
                 List<FileManagerDirectoryContent> copiedFiles = new List<FileManagerDirectoryContent>();
@@ -561,7 +582,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform the copy action.";
                     er.Code = "401";
                     copyResponse.Error = er;
                     return copyResponse;
@@ -586,7 +607,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 er.FileExists = copyResponse.Error?.FileExists;
                 copyResponse.Error = er;
                 return copyResponse;
@@ -595,7 +617,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 
         // Moves file(s) or folder(s).
         public virtual FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
-        {
+        { 
             FileManagerResponse moveResponse = new FileManagerResponse();
             try
             {
@@ -607,12 +629,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
-                    if (permission != null && (!permission.Read || !permission.Edit))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the write action.");
+                    }
                 }
                 AccessPermission PathPermission = GetPathPermission(targetPath);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + targetPath + "' is not accessible. Access is denied.");
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
                 List<string> existFiles = new List<string>();
                 List<string> missingFiles = new List<string>();
                 List<FileManagerDirectoryContent> movedFiles = new List<FileManagerDirectoryContent>();
@@ -727,7 +755,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform this action.";
                     er.Code = "401";
                     moveResponse.Error = er;
                     return moveResponse;
@@ -753,9 +781,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 ErrorDetails er = new ErrorDetails
                 {
                     Message = e.Message.ToString(),
-                    Code = e.Message.ToString().Contains("Access is denied") ? "401" : "417",
+                    Code = e.Message.ToString().Contains("is not accessible. You need permission") ? "401" : "417",
                     FileExists = moveResponse.Error?.FileExists
-                };
+                }; 
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 moveResponse.Error = er;
                 return moveResponse;
             }
@@ -784,7 +813,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
                 cwd.Permission = GetPathPermission(path);
                 if (cwd.Permission != null && !cwd.Permission.Read)
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                {
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the read action.");
+                }
                 searchResponse.CWD = cwd;
 
                 List<FileManagerDirectoryContent> foundedFiles = new List<FileManagerDirectoryContent>();
@@ -837,7 +869,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 searchResponse.Error = er;
                 return searchResponse;
             }
@@ -882,7 +915,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 AccessPermission PathPermission = GetPathPermission(path);
                 if (PathPermission != null && (!PathPermission.Read || !PathPermission.Upload))
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the upload action.");
+                }
                 List<string> existFiles = new List<string>();
                 foreach (IFormFile file in uploadFiles)
                 {
@@ -942,8 +978,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + path + "' is not accessible. Access is denied." : e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(path) + "' is not accessible. You need permission to perform the upload action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
             }
@@ -961,7 +998,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission FilePermission = GetPermission(physicalPath, names[i], IsFile);
                     if (FilePermission != null && (!FilePermission.Read || !FilePermission.Download))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the download action.");
 
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
                     if ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory)
@@ -1235,13 +1272,13 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             AccessPermission FilePermission = new AccessPermission();
             if (isFile)
             {
-                if (this.AccessDetails.FileRules == null) return null;
+                if (this.AccessDetails.AccessRules == null) return null;
                 string nameExtension = Path.GetExtension(name).ToLower();
                 string fileName = Path.GetFileNameWithoutExtension(name);
                 string currentPath = GetFilePath(location + name);
-                foreach (FileRule fileRule in AccessDetails.FileRules)
+                foreach (AccessRule fileRule in AccessDetails.AccessRules)
                 {
-                    if (!string.IsNullOrEmpty(fileRule.Path) && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
+                    if (!string.IsNullOrEmpty(fileRule.Path) && fileRule.IsFile && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
                     {
                         if (fileRule.Path.IndexOf("*.*") > -1)
                         {
@@ -1271,10 +1308,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
             else
             {
-                if (this.AccessDetails.FolderRules == null) { return null; }
-                foreach (FolderRule folderRule in AccessDetails.FolderRules)
+                if (this.AccessDetails.AccessRules == null) { return null; }
+                foreach (AccessRule folderRule in AccessDetails.AccessRules)
                 {
-                    if (folderRule.Path != null && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
+                    if (folderRule.Path != null && folderRule.IsFile == false && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
                     {
                         if (folderRule.Path.IndexOf("*") > -1)
                         {
@@ -1286,8 +1323,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             FilePermission = UpdateFolderRules(FilePermission, folderRule);
                         else if (GetValidPath(location + name).IndexOf(GetPath(folderRule.Path)) == 0)
                         {
-                            FilePermission.Edit = HasPermission(folderRule.EditContents);
-                            FilePermission.EditContents = HasPermission(folderRule.EditContents);
+                            FilePermission.Write = HasPermission(folderRule.WriteContents);
+                            FilePermission.WriteContents = HasPermission(folderRule.WriteContents);
                         }
                     }
                 }
@@ -1338,22 +1375,24 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             return rule == Permission.Allow ? true : false;
         }
-        public virtual AccessPermission UpdateFileRules(AccessPermission filePermission, FileRule fileRule)
+        public virtual AccessPermission UpdateFileRules(AccessPermission filePermission, AccessRule fileRule)
         {
             filePermission.Copy = HasPermission(fileRule.Copy);
             filePermission.Download = HasPermission(fileRule.Download);
-            filePermission.Edit = HasPermission(fileRule.Edit);
+            filePermission.Write = HasPermission(fileRule.Write);
             filePermission.Read = HasPermission(fileRule.Read);
+            filePermission.Message = string.IsNullOrEmpty(fileRule.Message)?string.Empty:fileRule.Message;
             return filePermission;
         }
-        public virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, FolderRule folderRule)
+        public virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, AccessRule folderRule)
         {
             folderPermission.Copy = HasPermission(folderRule.Copy);
             folderPermission.Download = HasPermission(folderRule.Download);
-            folderPermission.Edit = HasPermission(folderRule.Edit);
-            folderPermission.EditContents = HasPermission(folderRule.EditContents);
+            folderPermission.Write = HasPermission(folderRule.Write);
+            folderPermission.WriteContents = HasPermission(folderRule.WriteContents);
             folderPermission.Read = HasPermission(folderRule.Read);
             folderPermission.Upload = HasPermission(folderRule.Upload);
+            folderPermission.Message = string.IsNullOrEmpty(folderRule.Message) ? string.Empty : folderRule.Message;
             return folderPermission;
         }
         public virtual bool parentsHavePermission(FileManagerDirectoryContent fileDetails)
@@ -1379,7 +1418,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             return JsonConvert.SerializeObject(userData, new JsonSerializerSettings { ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() } });
         }
-
+        private string getFileNameFromPath(string path)
+        {
+            int index = path.LastIndexOf("/");
+            return path.Substring(index + 1);
+        }
         private bool CheckChild(string path)
         {
             bool hasChild;
