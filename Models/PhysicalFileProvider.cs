@@ -940,7 +940,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName =  Path.GetFileName(fullPath);
+                    fileStreamResult.FileDownloadName = Path.GetFileName(fullPath);
                 }
                 else if (names.Length > 1)
                 {
