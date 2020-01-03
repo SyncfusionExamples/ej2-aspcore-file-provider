@@ -88,7 +88,7 @@ namespace EJ2APIServices.Controllers
         public IActionResult Download(string downloadInput)
         {
             FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
-            return operation.Download(args.Path, args.Names);
+            return operation.Download(args.Path, args.Names, args.Data);
         }
 
         // gets the image(s) from the given path
