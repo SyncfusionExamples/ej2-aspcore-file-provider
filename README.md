@@ -10,18 +10,19 @@ ASP.NET Core file system provider serves the physical file system for the file m
 
 The following actions can be performed with ASP.NET Core file system Provider.
 
-- Read      - Read the files from the local file storage.
-- Details   - Gets a file's metadata which consists of Type, Size, Location and Modified date.
-- Download  - Download the selected file or folder
-- Upload    - Upload's the file. It accepts uploaded media with the following characteristics:
-                - Maximum file size:  30MB
-                - Accepted Media MIME types: */*
-- Create    - Create a new folder.
-- Delete    - Delete a folder or file.
-- Copy      - Copies the contents of the file from the target location .
-- Move      - Paste the copied files to the desired location.
-- Rename    - Rename a folder or file.
-- Search    - Search a file or folder.
+| **Actions** | **Description** |
+| --- | --- |
+| Read      | Read the files from the local file storage. |
+| Details   | Gets a file's metadata which consists of Type, Size, Location and Modified date. |
+| Download  | Download the selected file or folder. |
+| Upload    | Upload's the file. t accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*`
+</li></ul> |
+| Create    | Create a new folder. |
+| Delete    | Delete a folder or file. |
+| Copy      | Copies the contents of the file from the target location . |
+| Move      | Paste the copied files to the desired location. |
+| Rename    | Rename a folder or file. |
+| Search    | Search a file or folder. |
 
 ## How to run this application?
 
@@ -30,7 +31,7 @@ To run this application, you need to first clone the `ej2-aspcore-file-provider`
 To do so, open the command prompt and run the below commands one after the other.
 
 ```
-git clone https://github.com/ej2-aspcore-file-provider  ej2-aspcore-file-provider
+git clone https://github.com/SyncfusionExamples/ej2-aspcore-file-provider  ej2-aspcore-file-provider
 
 cd ej2-aspcore-file-provider
 
@@ -39,6 +40,59 @@ cd ej2-aspcore-file-provider
 ## Running application
 
 Once cloned, open solution file in visual studio.Then build the project after restoring the nuget packages and run it.
+
+## File Manager AjaxSettings
+
+To access the basic actions such as Read, Delete, Copy, Move, Rename, Search, and Get Details of File Manager using Azure service, just map the following code snippet in the Ajaxsettings property of File Manager.
+
+Here, the `hostUrl` will be your locally hosted port number.
+
+```
+  var hostUrl = http://localhost:62870/;
+  ajaxSettings: {
+        url: hostUrl + 'api/FileManager/FileOperations'
+  }
+```
+
+## File download AjaxSettings
+
+To perform download operation, initialize the `downloadUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:62870/;
+  ajaxSettings: {
+        url: hostUrl + 'api/FileManager/FileOperations',
+        downloadUrl: hostUrl +'api/FileManager/Download'
+  }
+```
+
+## File upload AjaxSettings
+
+To perform upload operation, initialize the `uploadUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:62870/;
+  ajaxSettings: {
+        url: hostUrl + 'api/FileManager/FileOperations',
+        uploadUrl: hostUrl +'api/FileManager/Upload'
+  }
+```
+
+## File image preview AjaxSettings
+
+To perform image preview support in the File Manager component, initialize the `getImageUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:62870/;
+  ajaxSettings: {
+        url: hostUrl + 'api/FileManager/FileOperations',
+         getImageUrl: hostUrl +'api/FileManager/GetImage'
+  }
+```
+
+The FileManager will be rendered as the following.
+
+![File Manager](https://ej2.syncfusion.com/products/images/file-manager/readme.gif)
 
 ## Support
 

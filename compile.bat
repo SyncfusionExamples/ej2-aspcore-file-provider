@@ -1,1 +1,0 @@
-npm install & gulp version --option %1 & gulp generate-nuget

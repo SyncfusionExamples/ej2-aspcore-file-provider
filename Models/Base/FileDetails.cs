@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
 
 namespace Syncfusion.EJ2.FileManager.Base
 {
@@ -14,5 +11,6 @@ namespace Syncfusion.EJ2.FileManager.Base
         public DateTime Created { get; set; }
         public DateTime Modified { get; set; }
         public bool MultipleFiles { get; set; }
+        public AccessPermission Permission { get; set; }
     }
 }

@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Net.Http.Headers;
 
 
 namespace Syncfusion.EJ2.FileManager.Base
@@ -18,12 +14,6 @@ namespace Syncfusion.EJ2.FileManager.Base
         public string NewName { get; set; }
 
         public string[] Names { get; set; }
-
-        public string[] RenameFiles { get; set; }
-
-        public string TargetPath { get; set; }
-
-        public FileManagerDirectoryContent TargetData { get; set; }
 
         public string Name { get; set; }
 
@@ -47,28 +37,24 @@ namespace Syncfusion.EJ2.FileManager.Base
 
         public string FilterId { get; set; }
 
+        public string ParentId { get; set; }
+
+        public string TargetPath { get; set; }
+
+        public string[] RenameFiles { get; set; }
+
         public IList<IFormFile> UploadFiles { get; set; }
 
-
         public bool CaseSensitive { get; set; }
-
 
         public string SearchString { get; set; }
 
         public bool ShowHiddenItems { get; set; }
 
-        public string IconClass { get; set; }
-
-        public string NodeId { get; set; }
-
-        public string ParentID { get; set; }
-
-        public bool Selected { get; set; }
-
-        public string Icon { get; set; }
-     
         public FileManagerDirectoryContent[] Data { get; set; }
 
+        public FileManagerDirectoryContent TargetData { get; set; }
 
+        public AccessPermission Permission { get; set; }
     }
 }
