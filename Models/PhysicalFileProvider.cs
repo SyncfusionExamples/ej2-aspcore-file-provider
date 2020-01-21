@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Syncfusion.EJ2.FileManager.Base;
 
+
 namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 {
     public class PhysicalFileProvider : PhysicalFileProviderBase
@@ -22,6 +23,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string hostPath;
         protected string hostName;
         private string accessMessage = string.Empty;
+        string pattern = "../*";
+        string replacement = "/";
 
         // Sets the root path
         public void RootFolder(string name)
@@ -42,6 +45,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         // Reads the files within the directorty
         public virtual FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
+            path = Regex.Replace(path, pattern, replacement);
             FileManagerResponse readResponse = new FileManagerResponse();
             try
             {
@@ -227,7 +231,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 
                     return createResponse;
                 }
-
                 string physicalPath = GetPath(path);
                 Directory.CreateDirectory(newDirectoryPath);
                 DirectoryInfo directory = new DirectoryInfo(newDirectoryPath);
@@ -894,6 +897,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         //Returns the image
         public virtual FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
+            path = Regex.Replace(path, pattern, replacement);
             try
             {
                 AccessPermission PathPermission = GetFilePermission(path);
@@ -911,6 +915,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
+            path = Regex.Replace(path, pattern, replacement);
             try
             {
                 AccessPermission PathPermission = GetPathPermission(path);
@@ -988,6 +993,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         // Download file(s) or folder(s) from the file system
         public virtual FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
+            path = Regex.Replace(path, pattern, replacement);
             try
             {
                 string physicalPath = GetPath(path);
@@ -1012,6 +1018,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         private FileStreamResult fileStreamResult;
         public virtual FileStreamResult DownloadFile(string path, string[] names = null)
         {
+            path = Regex.Replace(path, pattern, replacement);
             try
             {
                 path = Path.GetDirectoryName(path);
@@ -1075,6 +1082,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         // Downloads the directories
         protected FileStreamResult DownloadFolder(string path, string[] names, int count)
         {
+            path = Regex.Replace(path, pattern, replacement);
             try
             {
                 if (!String.IsNullOrEmpty(path))
