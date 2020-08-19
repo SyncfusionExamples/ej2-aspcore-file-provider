@@ -1,34 +1,51 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using Syncfusion.EJ2.FileManager.Base;
+
+
+#if EJ2_DNX
+using System.Web.Mvc;
+using System.IO.Packaging;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Drawing.Drawing2D;
+using System.Web;
+#else
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Net.Http.Headers;
+#endif
 
 namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 {
     public class PhysicalFileProvider : PhysicalFileProviderBase
     {
         protected string contentRootPath;
-        protected string[] allowedExtention = new string[] { "*" };
+        protected string[] allowedExtension = new string[] { "*" };
         AccessDetails AccessDetails = new AccessDetails();
-        protected string rootName;
+        private string rootName = string.Empty;
         protected string hostPath;
         protected string hostName;
+        private string accessMessage = string.Empty;
 
-        // Sets the root path
+        public PhysicalFileProvider()
+        {
+        }
+
         public void RootFolder(string name)
         {
             this.contentRootPath = name;
             this.hostName = new Uri(contentRootPath).Host;
             if (!string.IsNullOrEmpty(this.hostName))
+            {
                 this.hostPath = Path.DirectorySeparatorChar + this.hostName + Path.DirectorySeparatorChar + contentRootPath.Substring((contentRootPath.ToLower().IndexOf(this.hostName) + this.hostName.Length + 1));
+            }
         }
 
         public void SetRules(AccessDetails details)
@@ -38,16 +55,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             this.rootName = root.Name;
         }
 
-        // Reads the files within the directorty
         public virtual FileManagerResponse GetFiles(string path, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readResponse = new FileManagerResponse();
             try
             {
-                if (path == null) path = string.Empty;
+                if (path == null)
+                {
+                    path = string.Empty;
+                }
                 String fullPath = (contentRootPath + path);
                 DirectoryInfo directory = new DirectoryInfo(fullPath);
-                string[] extensions = this.allowedExtention;
+                string[] extensions = this.allowedExtension;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
                 string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
@@ -64,7 +83,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
                 {
                     readResponse.Files = null;
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
                 }
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
@@ -74,13 +94,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 readResponse.Error = er;
                 return readResponse;
             }
         }
-        // Reads each file
-        public virtual IEnumerable<FileManagerDirectoryContent> ReadFiles(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
+
+        protected virtual IEnumerable<FileManagerDirectoryContent> ReadFiles(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -121,11 +142,13 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
                 return readFiles.Files;
             }
-            catch (Exception e) { throw e; }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
 
-        // Gets pelative path of file or folder
-        public string GetRelativePath(string rootPath, string fullPath)
+        protected string GetRelativePath(string rootPath, string fullPath)
         {
             if (!String.IsNullOrEmpty(rootPath) && !String.IsNullOrEmpty(fullPath))
             {
@@ -133,29 +156,38 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (!string.IsNullOrEmpty(this.hostName))
                 {
                     if (rootPath.Contains(this.hostName) || rootPath.ToLower().Contains(this.hostName) || rootPath.ToUpper().Contains(this.hostName))
+                    {
                         rootPath = rootPath.Substring(rootPath.IndexOf(this.hostName, StringComparison.CurrentCultureIgnoreCase) + this.hostName.Length);
+                    }
                     if (fullPath.Contains(this.hostName) || fullPath.ToLower().Contains(this.hostName) || fullPath.ToUpper().Contains(this.hostName))
+                    {
                         fullPath = fullPath.Substring(fullPath.IndexOf(this.hostName, StringComparison.CurrentCultureIgnoreCase) + this.hostName.Length);
+                    }
                     rootDirectory = new DirectoryInfo(rootPath);
                     fullPath = new DirectoryInfo(fullPath).FullName;
                     rootPath = new DirectoryInfo(rootPath).FullName;
                 }
                 else
+                {
                     rootDirectory = new DirectoryInfo(rootPath);
+                }
                 if (rootDirectory.FullName.Substring(rootDirectory.FullName.Length - 1) == Path.DirectorySeparatorChar.ToString())
                 {
                     if (fullPath.Contains(rootDirectory.FullName))
+                    {
                         return fullPath.Substring(rootPath.Length - 1);
+                    }
                 }
                 else if (fullPath.Contains(rootDirectory.FullName + Path.DirectorySeparatorChar))
+                {
                     return Path.DirectorySeparatorChar + fullPath.Substring(rootPath.Length + 1);
+                }
             }
             return String.Empty;
         }
 
 
-        // Reads child files within the directories
-        public virtual IEnumerable<FileManagerDirectoryContent> ReadDirectories(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
+        protected virtual IEnumerable<FileManagerDirectoryContent> ReadDirectories(DirectoryInfo directory, string[] extensions, bool showHiddenItems, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse readDirectory = new FileManagerResponse();
             try
@@ -195,18 +227,22 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
                 return readDirectory.Files;
             }
-            catch (Exception e) { throw e; }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
-
-        // Creates a newFolder
         public virtual FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse createResponse = new FileManagerResponse();
             try
             {
                 AccessPermission PathPermission = GetPathPermission(path);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
 
                 string newDirectoryPath = Path.Combine(contentRootPath + path, name);
 
@@ -243,12 +279,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 createResponse.Error = er;
                 return createResponse;
             }
         }
-        // Gets the details of the selected item(s).
         public virtual FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse getDetailResponse = new FileManagerResponse();
@@ -259,7 +295,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     if (path == null) { path = string.Empty; };
                     string fullPath = "";
-                    fullPath = (names.Length == 0) ? (contentRootPath + path.Substring(0, path.Length - 1)) : ((names[0] == null || names[0] == "") ? (contentRootPath + path) : Path.Combine(contentRootPath + path, names[0]));
+                    if (names.Length == 0)
+                    {
+                        fullPath = (contentRootPath + path.Substring(0, path.Length - 1));
+                    }
+                    else if (string.IsNullOrEmpty(names[0]))
+                    {
+                        fullPath = (contentRootPath + path);
+                    }
+                    else
+                    {
+                        fullPath = Path.Combine(contentRootPath + path, names[0]);
+                    }
                     string physicalPath = GetPath(path);
                     DirectoryInfo directory = new DirectoryInfo(fullPath);
                     FileInfo info = new FileInfo(fullPath);
@@ -277,29 +324,37 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 else
                 {
                     bool isVariousFolders = false;
+                    string relativePath = "";
                     string previousPath = "";
                     string previousName = "";
                     FileDetails fileDetails = new FileDetails();
                     fileDetails.Size = "0";
+                    DirectoryInfo baseDirectory = new DirectoryInfo(string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : this.hostPath);
+                    string parentPath = baseDirectory.Parent.FullName;
+                    string baseDirectoryParentPath = string.IsNullOrEmpty(this.hostName) ? parentPath : parentPath + Path.DirectorySeparatorChar;
                     for (int i = 0; i < names.Length; i++)
                     {
                         string fullPath = "";
-                        fullPath = (names[i] == null) ? (contentRootPath + path) : Path.Combine(contentRootPath + path, names[i]);
-                        DirectoryInfo baseDirectory = new DirectoryInfo(string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : this.hostPath);
-                        string baseDirectoryParentPath = string.IsNullOrEmpty(this.hostName) ? baseDirectory.Parent.FullName : baseDirectory.Parent.FullName + Path.DirectorySeparatorChar;
+                        if (names[i] == null)
+                        {
+                            fullPath = (contentRootPath + path);
+                        }
+                        else
+                        {
+                            fullPath = Path.Combine(contentRootPath + path, names[i]);
+                        }
                         FileInfo info = new FileInfo(fullPath);
                         fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName = previousName + ", " + data[i].Name;
                         fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : GetDirectorySize(new DirectoryInfo(fullPath), 0))).ToString();
-                        previousPath = previousPath == "" ? GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) : previousPath;
-                        if (previousPath == GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) && !isVariousFolders)
+                        relativePath = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName);
+                        previousPath = previousPath == "" ? relativePath : previousPath;
+                        if (previousPath == relativePath && !isVariousFolders)
                         {
-                            previousPath = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName);
-                            fileDetails.Location = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName).Substring(1);
+                            previousPath = relativePath;
                         }
                         else
                         {
                             isVariousFolders = true;
-                            fileDetails.Location = "Various Folders";
                         }
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
@@ -313,12 +368,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
                 getDetailResponse.Error = er;
                 return getDetailResponse;
             }
         }
-        // Deletes file(s) or folder(s).
+
         public virtual FileManagerResponse Delete(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
@@ -331,8 +386,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
-                    if (permission != null && (!permission.Read || !permission.Edit))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible.  you need permission to perform the write action.");
+                    }
                 }
                 FileManagerDirectoryContent removingFile;
                 for (int i = 0; i < names.Length; i++)
@@ -345,45 +403,66 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         removingFile = GetFileDetails(fullPath);
                         //detect whether its a directory or file
                         if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
+                        {
                             result = DeleteDirectory(fullPath);
+                        }
                         else
                         {
-                            try { File.Delete(fullPath); }
+                            try
+                            {
+                                File.Delete(fullPath);
+                            }
                             catch (Exception e)
                             {
                                 if (e.GetType().Name == "UnauthorizedAccessException")
+                                {
                                     result = fullPath;
+                                }
                                 else
+                                {
                                     throw e;
+                                }
                             }
                         }
-                        if (result != String.Empty) break;
+                        if (result != String.Empty)
+                        {
+                            break;
+
+                        }
                         removedFiles.Add(removingFile);
                     }
-                    else throw new ArgumentNullException("name should not be null");
+                    else
+                    {
+                        throw new ArgumentNullException("name should not be null");
+                    }
                 }
                 DeleteResponse.Files = removedFiles;
                 if (result != String.Empty)
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible.  you need permission to perform the write action.";
                     er.Code = "401";
+                    if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                     DeleteResponse.Error = er;
                     return DeleteResponse;
                 }
-                else return DeleteResponse;
+                else
+                {
+                    return DeleteResponse;
+                }
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 DeleteResponse.Error = er;
                 return DeleteResponse;
             }
         }
-        // Renames file(s) or folder(s).
+
         public virtual FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse renameResponse = new FileManagerResponse();
@@ -392,12 +471,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string physicalPath = GetPath(path);
                 bool IsFile = !IsDirectory(physicalPath, name);
                 AccessPermission permission = GetPermission(physicalPath, name, IsFile);
-                if (permission != null && (!permission.Read || !permission.Edit))
+                if (permission != null && (!permission.Read || !permission.Write))
+                {
+                    accessMessage = permission.Message;
                     throw new UnauthorizedAccessException();
+                }
+
                 string tempPath = (contentRootPath + path);
                 string oldPath = Path.Combine(tempPath, name);
                 string newPath = Path.Combine(tempPath, newName);
                 FileAttributes attr = File.GetAttributes(oldPath);
+
                 FileInfo info = new FileInfo(oldPath);
                 bool isFile = (File.GetAttributes(oldPath) & FileAttributes.Directory) != FileAttributes.Directory;
                 if (isFile)
@@ -423,6 +507,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         er.Code = "400";
                         er.Message = "Cannot rename " + exist.Name.ToString() + " to " + newName + ": destination already exists.";
                         renameResponse.Error = er;
+
                         return renameResponse;
                     }
                     else if (oldPath.Equals(newPath, StringComparison.OrdinalIgnoreCase))
@@ -431,41 +516,57 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         Directory.Move(oldPath, tempPath);
                         Directory.Move(tempPath, newPath);
                     }
-                    else Directory.Move(oldPath, newPath);
+                    else
+                    {
+                        Directory.Move(oldPath, newPath);
+                    }
                 }
-                FileManagerDirectoryContent[] addedData = new[] { GetFileDetails(newPath) };
+                FileManagerDirectoryContent[] addedData = new[]{
+                        GetFileDetails(newPath)
+                    };
                 renameResponse.Files = addedData;
                 return renameResponse;
             }
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.rootName + path + name + "' is not accessible. Access is denied." : e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(this.rootName + path + name) + "' is not accessible. You need permission to perform the write action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 renameResponse.Error = er;
                 return renameResponse;
             }
         }
 
-        // Copies file(s) or folder(s).
         public virtual FileManagerResponse Copy(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse copyResponse = new FileManagerResponse();
             try
             {
                 string result = String.Empty;
-                if (renameFiles == null) renameFiles = new string[0];
+                if (renameFiles == null)
+                {
+                    renameFiles = new string[0];
+                }
                 string physicalPath = GetPath(path);
                 for (int i = 0; i < names.Length; i++)
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
                     if (permission != null && (!permission.Read || !permission.Copy))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the copy action.");
+                    }
                 }
                 AccessPermission PathPermission = GetPathPermission(targetPath);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + targetPath + "' is not accessible. Access is denied.");
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
+
+
                 List<string> existFiles = new List<string>();
                 List<string> missingFiles = new List<string>();
                 List<FileManagerDirectoryContent> copiedFiles = new List<FileManagerDirectoryContent>();
@@ -479,7 +580,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         path = tempPath + names[i].Substring(0, name + 1);
                         names[i] = names[i].Substring(name + 1);
                     }
-                    else path = tempPath;
+                    else
+                    {
+                        path = tempPath;
+                    }
                     string itemPath = Path.Combine(contentRootPath + path, names[i]);
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
@@ -493,7 +597,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             {
                                 int index = -1;
                                 if (renameFiles.Length > 0)
+                                {
                                     index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
+                                }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
                                     newPath = DirectoryRename(newPath);
@@ -503,7 +609,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                     detail.PreviousName = names[i];
                                     copiedFiles.Add(detail);
                                 }
-                                else existFiles.Add(fullname);
+                                else
+                                {
+                                    existFiles.Add(fullname);
+                                }
                             }
                             else
                             {
@@ -527,7 +636,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 {
                                     int index = -1;
                                     if (renameFiles.Length > 0)
+                                    {
                                         index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
+                                    }
                                     if ((newPath == oldPath) || (index != -1))
                                     {
                                         newPath = FileRename(newPath, fileName);
@@ -536,11 +647,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                         detail.PreviousName = names[i];
                                         copiedFiles.Add(detail);
                                     }
-                                    else existFiles.Add(fullname);
+                                    else
+                                    {
+                                        existFiles.Add(fullname);
+                                    }
                                 }
                                 else
                                 {
-                                    if (renameFiles.Length > 0) File.Delete(newPath);
+                                    if (renameFiles.Length > 0)
+                                    {
+                                        File.Delete(newPath);
+                                    }
                                     File.Copy(oldPath, newPath);
                                     FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                     detail.PreviousName = names[i];
@@ -549,23 +666,34 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             }
                             catch (Exception e)
                             {
-                                if (e.GetType().Name == "UnauthorizedAccessException") { result = newPath; break; }
-                                else throw e;
+                                if (e.GetType().Name == "UnauthorizedAccessException")
+                                {
+                                    result = newPath;
+                                    break;
+                                }
+                                else
+                                {
+                                    throw e;
+                                }
                             }
                         }
                     }
-                    else missingFiles.Add(names[i]);
+                    else
+                    {
+                        missingFiles.Add(names[i]);
+                    }
                 }
                 copyResponse.Files = copiedFiles;
                 if (result != String.Empty)
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform the copy action.";
                     er.Code = "401";
                     copyResponse.Error = er;
                     return copyResponse;
                 }
+
                 if (existFiles.Count > 0)
                 {
                     ErrorDetails er = new ErrorDetails();
@@ -574,11 +702,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     er.Message = "File Already Exists";
                     copyResponse.Error = er;
                 }
-                if (missingFiles.Count == 0) return copyResponse;
+                if (missingFiles.Count == 0)
+                {
+                    return copyResponse;
+                }
                 else
                 {
                     string namelist = missingFiles[0];
-                    for (int k = 1; k < missingFiles.Count; k++) { namelist = namelist + ", " + missingFiles[k]; }
+                    for (int k = 1; k < missingFiles.Count; k++)
+                    {
+                        namelist = namelist + ", " + missingFiles[k];
+                    }
                     throw new FileNotFoundException(namelist + " not found in given location.");
                 }
             }
@@ -586,14 +720,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 er.FileExists = copyResponse.Error?.FileExists;
                 copyResponse.Error = er;
                 return copyResponse;
             }
         }
 
-        // Moves file(s) or folder(s).
         public virtual FileManagerResponse Move(string path, string targetPath, string[] names, string[] renameFiles, FileManagerDirectoryContent targetData, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse moveResponse = new FileManagerResponse();
@@ -601,18 +735,27 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 string result = String.Empty;
                 if (renameFiles == null)
+                {
                     renameFiles = new string[0];
+                }
                 string physicalPath = GetPath(path);
                 for (int i = 0; i < names.Length; i++)
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission permission = GetPermission(physicalPath, names[i], IsFile);
-                    if (permission != null && (!permission.Read || !permission.Edit))
-                        throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
+                    if (permission != null && (!permission.Read || !permission.Write))
+                    {
+                        accessMessage = permission.Message;
+                        throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the write action.");
+                    }
                 }
                 AccessPermission PathPermission = GetPathPermission(targetPath);
-                if (PathPermission != null && (!PathPermission.Read || !PathPermission.EditContents))
-                    throw new UnauthorizedAccessException("'" + this.rootName + targetPath + "' is not accessible. Access is denied.");
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + targetPath) + "' is not accessible. You need permission to perform the writeContents action.");
+                }
+
                 List<string> existFiles = new List<string>();
                 List<string> missingFiles = new List<string>();
                 List<FileManagerDirectoryContent> movedFiles = new List<FileManagerDirectoryContent>();
@@ -626,7 +769,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         path = tempPath + names[i].Substring(0, name + 1);
                         names[i] = names[i].Substring(name + 1);
                     }
-                    else path = tempPath;
+                    else
+                    {
+                        path = tempPath;
+                    }
                     string itemPath = Path.Combine(contentRootPath + path, names[i]);
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
@@ -639,7 +785,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (exist)
                             {
                                 int index = -1;
-                                if (renameFiles.Length > 0) index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
+                                if (renameFiles.Length > 0)
+                                {
+                                    index = Array.FindIndex(renameFiles, row => row.Contains(directoryName));
+                                }
                                 if ((newPath == oldPath) || (index != -1))
                                 {
                                     newPath = DirectoryRename(newPath);
@@ -655,7 +804,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                     detail.PreviousName = names[i];
                                     movedFiles.Add(detail);
                                 }
-                                else existFiles.Add(fullName);
+                                else
+                                {
+                                    existFiles.Add(fullName);
+                                }
                             }
                             else
                             {
@@ -666,7 +818,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 {
                                     result = DeleteDirectory(oldPath);
                                     if (result != String.Empty) { break; }
-
                                 }
                                 FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                 detail.PreviousName = names[i];
@@ -686,24 +837,35 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 {
                                     int index = -1;
                                     if (renameFiles.Length > 0)
+                                    {
                                         index = Array.FindIndex(renameFiles, row => row.Contains(fileName));
+                                    }
                                     if ((newPath == oldPath) || (index != -1))
                                     {
                                         newPath = FileRename(newPath, fileName);
                                         File.Copy(oldPath, newPath);
                                         bool isExist = File.Exists(oldPath);
-                                        if (isExist) File.Delete(oldPath);
+                                        if (isExist)
+                                        {
+                                            File.Delete(oldPath);
+                                        }
                                         FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                         detail.PreviousName = names[i];
                                         movedFiles.Add(detail);
                                     }
-                                    else existFiles.Add(fullName);
+                                    else
+                                    {
+                                        existFiles.Add(fullName);
+                                    }
                                 }
                                 else
                                 {
                                     File.Copy(oldPath, newPath);
                                     bool isExist = File.Exists(oldPath);
-                                    if (isExist) File.Delete(oldPath);
+                                    if (isExist)
+                                    {
+                                        File.Delete(oldPath);
+                                    }
                                     FileManagerDirectoryContent detail = GetFileDetails(newPath);
                                     detail.PreviousName = names[i];
                                     movedFiles.Add(detail);
@@ -714,20 +876,27 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             {
                                 if (e.GetType().Name == "UnauthorizedAccessException")
                                 {
-                                    result = newPath; break;
+                                    result = newPath;
+                                    break;
                                 }
-                                else throw e;
+                                else
+                                {
+                                    throw e;
+                                }
                             }
                         }
                     }
-                    else missingFiles.Add(names[i]);
+                    else
+                    {
+                        missingFiles.Add(names[i]);
+                    }
                 }
                 moveResponse.Files = movedFiles;
                 if (result != String.Empty)
                 {
                     string deniedPath = result.Substring(this.contentRootPath.Length);
                     ErrorDetails er = new ErrorDetails();
-                    er.Message = "'" + deniedPath + "' is not accessible. Access is denied.";
+                    er.Message = "'" + this.getFileNameFromPath(deniedPath) + "' is not accessible. You need permission to perform this action.";
                     er.Code = "401";
                     moveResponse.Error = er;
                     return moveResponse;
@@ -740,11 +909,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     er.Message = "File Already Exists";
                     moveResponse.Error = er;
                 }
-                if (missingFiles.Count == 0) return moveResponse;
+                if (missingFiles.Count == 0)
+                {
+                    return moveResponse;
+                }
                 else
                 {
                     string namelist = missingFiles[0];
-                    for (int k = 1; k < missingFiles.Count; k++) { namelist = namelist + ", " + missingFiles[k]; }
+                    for (int k = 1; k < missingFiles.Count; k++)
+                    {
+                        namelist = namelist + ", " + missingFiles[k];
+                    }
                     throw new FileNotFoundException(namelist + " not found in given location.");
                 }
             }
@@ -753,15 +928,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 ErrorDetails er = new ErrorDetails
                 {
                     Message = e.Message.ToString(),
-                    Code = e.Message.ToString().Contains("Access is denied") ? "401" : "417",
+                    Code = e.Message.ToString().Contains("is not accessible. You need permission") ? "401" : "417",
                     FileExists = moveResponse.Error?.FileExists
                 };
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 moveResponse.Error = er;
                 return moveResponse;
             }
         }
 
-        // Search for particular file(s) or folder(s).
         public virtual FileManagerResponse Search(string path, string searchString, bool showHiddenItems = false, bool caseSensitive = false, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse searchResponse = new FileManagerResponse();
@@ -784,11 +959,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
                 cwd.Permission = GetPathPermission(path);
                 if (cwd.Permission != null && !cwd.Permission.Read)
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                {
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the read action.");
+                }
                 searchResponse.CWD = cwd;
 
                 List<FileManagerDirectoryContent> foundedFiles = new List<FileManagerDirectoryContent>();
-                string[] extensions = this.allowedExtention;
+                string[] extensions = this.allowedExtension;
                 DirectoryInfo searchDirectory = new DirectoryInfo(searchPath);
                 List<FileInfo> files = new List<FileInfo>();
                 List<DirectoryInfo> directories = new List<DirectoryInfo>();
@@ -802,13 +980,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     {
                         FileManagerDirectoryContent fileDetails = GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name));
                         bool hasPermission = parentsHavePermission(fileDetails);
-                        if (hasPermission) foundedFiles.Add(fileDetails);
+                        if (hasPermission)
+                        {
+                            foundedFiles.Add(fileDetails);
+                        }
                     }
                     foreach (DirectoryInfo dir in filteredDirectoryList)
                     {
                         FileManagerDirectoryContent dirDetails = GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName));
                         bool hasPermission = parentsHavePermission(dirDetails);
-                        if (hasPermission) foundedFiles.Add(dirDetails);
+                        if (hasPermission)
+                        {
+                            foundedFiles.Add(dirDetails);
+                        }
                     }
                 }
                 else
@@ -821,13 +1005,19 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     {
                         FileManagerDirectoryContent fileDetails = GetFileDetails(Path.Combine(this.contentRootPath, file.DirectoryName, file.Name));
                         bool hasPermission = parentsHavePermission(fileDetails);
-                        if (hasPermission) foundedFiles.Add(fileDetails);
+                        if (hasPermission)
+                        {
+                            foundedFiles.Add(fileDetails);
+                        }
                     }
                     foreach (DirectoryInfo dir in filteredDirectoryList)
                     {
                         FileManagerDirectoryContent dirDetails = GetFileDetails(Path.Combine(this.contentRootPath, dir.FullName));
                         bool hasPermission = parentsHavePermission(dirDetails);
-                        if (hasPermission) foundedFiles.Add(dirDetails);
+                        if (hasPermission)
+                        {
+                            foundedFiles.Add(dirDetails);
+                        }
                     }
                 }
                 searchResponse.Files = (IEnumerable<FileManagerDirectoryContent>)foundedFiles;
@@ -837,28 +1027,41 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
                 er.Message = e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 searchResponse.Error = er;
                 return searchResponse;
             }
         }
-        // Converts the bytes to definite size values
-        public String byteConversion(long fileSize)
+
+        protected String byteConversion(long fileSize)
         {
             try
             {
                 string[] index = { "B", "KB", "MB", "GB", "TB", "PB", "EB" }; //Longs run out around EB
-                if (fileSize == 0) return "0 " + index[0];
-                int loc = Convert.ToInt32(Math.Floor(Math.Log((Math.Abs(fileSize)), 1024)));
-                return (Math.Sign(fileSize) * (Math.Round((Math.Abs(fileSize)) / Math.Pow(1024, loc), 1))).ToString() + " " + index[loc];
+                if (fileSize == 0)
+                {
+                    return "0 " + index[0];
+                }
+
+                long bytes = Math.Abs(fileSize);
+                int loc = Convert.ToInt32(Math.Floor(Math.Log(bytes, 1024)));
+                double num = Math.Round(bytes / Math.Pow(1024, loc), 1);
+                return (Math.Sign(fileSize) * num).ToString() + " " + index[loc];
             }
-            catch (Exception e) { throw e; }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
-        public virtual string WildcardToRegex(string pattern)
+        protected virtual string WildcardToRegex(string pattern)
         {
-            return "^" + Regex.Escape(pattern).Replace(@"\*", ".*").Replace(@"\?", ".") + "$";
+            return "^" + Regex.Escape(pattern)
+                              .Replace(@"\*", ".*")
+                              .Replace(@"\?", ".")
+                       + "$";
         }
-        //Returns the image
+
         public virtual FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
             try
@@ -867,41 +1070,145 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (PathPermission != null && !PathPermission.Read)
                     return null;
                 String fullPath = (contentRootPath + path);
+#if EJ2_DNX
+                if (allowCompress)
+                {
+                    size = new ImageSize { Height = 14, Width = 16 };
+                    CompressImage(fullPath, size);
+                }
+#endif
+
                 FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                 FileStreamResult fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                 return fileStreamResult;
             }
-            catch (Exception) { return null; }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
-        // Uploads the file(s) to the files system.
+#if EJ2_DNX
+        protected virtual void CompressImage(string path, ImageSize targetSize)
+        {
+            using (var image = Image.FromStream(System.IO.File.OpenRead(path)))
+            {
+                var originalSize = new ImageSize { Height = image.Height, Width = image.Width };
+                var size = FindRatio(originalSize, targetSize);
+                using (var thumbnail = new Bitmap(size.Width, size.Height))
+                {
+                    using (var graphics = Graphics.FromImage(thumbnail))
+                    {
+                        graphics.CompositingMode = CompositingMode.SourceCopy;
+                        graphics.CompositingQuality = CompositingQuality.HighQuality;
+                        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                        graphics.PixelOffsetMode = PixelOffsetMode.Default;
+                        graphics.InterpolationMode = InterpolationMode.Bicubic;
+                        graphics.DrawImage(image, 0, 0, thumbnail.Width, thumbnail.Height);
+                    }
+
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        thumbnail.Save(memoryStream, ImageFormat.Png);
+                        HttpResponse response = HttpContext.Current.Response;
+                        response.Buffer = true;
+                        response.Clear();
+                        response.ContentType = "image/png";
+                        response.BinaryWrite(memoryStream.ToArray());
+                        response.Flush();
+                        response.End();
+                    }
+                }
+            }
+        }
+      
+        protected virtual ImageSize FindRatio(ImageSize originalSize, ImageSize targetSize)
+        {
+            var aspectRatio = (float)originalSize.Width / (float)originalSize.Height;
+            var width = targetSize.Width;
+            var height = targetSize.Height;
+
+            if (originalSize.Width > targetSize.Width || originalSize.Height > targetSize.Height)
+            {
+                if (aspectRatio > 1)
+                {
+                    height = (int)(targetSize.Height / aspectRatio);
+                }
+                else
+                {
+                    width = (int)(targetSize.Width * aspectRatio);
+                }
+            }
+            else
+            {
+                width = originalSize.Width;
+                height = originalSize.Height;
+            }
+
+            return new ImageSize
+            {
+                Width = Math.Max(width, 1),
+                Height = Math.Max(height, 1)
+            };
+        }
+#endif
+#if EJ2_DNX
+        public virtual FileManagerResponse Upload(string path, IList<System.Web.HttpPostedFileBase> uploadFiles, string action, params FileManagerDirectoryContent[] data)
+#else
         public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
+#endif
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
             try
             {
                 AccessPermission PathPermission = GetPathPermission(path);
                 if (PathPermission != null && (!PathPermission.Read || !PathPermission.Upload))
-                    throw new UnauthorizedAccessException("'" + this.rootName + path + "' is not accessible. Access is denied.");
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path) + "' is not accessible. You need permission to perform the upload action.");
+                }
+
                 List<string> existFiles = new List<string>();
+#if EJ2_DNX
+                foreach (System.Web.HttpPostedFileBase file in uploadFiles)
+#else
                 foreach (IFormFile file in uploadFiles)
+#endif
                 {
                     if (uploadFiles != null)
                     {
-                        string name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
-                        string fullName = Path.Combine((this.contentRootPath + path), name);
+#if EJ2_DNX
+                        var name = System.IO.Path.GetFileName(file.FileName);
+                        var fullName = Path.Combine((this.contentRootPath + path), name);
+#else
+                        var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim().ToString();
+                        var fullName = Path.Combine((this.contentRootPath + path), name);
+#endif
                         if (action == "save")
                         {
                             if (!System.IO.File.Exists(fullName))
                             {
-                                using (FileStream fs = System.IO.File.Create(fullName)) { file.CopyTo(fs); fs.Flush(); }
+#if !EJ2_DNX
+                                using (FileStream fs = System.IO.File.Create(fullName))
+                                {
+                                    file.CopyTo(fs);
+                                    fs.Flush();
+                                }
+#else
+                                file.SaveAs(fullName);
+#endif
                             }
-                            else existFiles.Add(fullName);
+                            else
+                            {
+                                existFiles.Add(fullName);
+                            }
                         }
                         else if (action == "remove")
                         {
                             if (System.IO.File.Exists(fullName))
+                            {
                                 System.IO.File.Delete(fullName);
+                            }
                             else
                             {
                                 ErrorDetails er = new ErrorDetails();
@@ -913,8 +1220,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         else if (action == "replace")
                         {
                             if (System.IO.File.Exists(fullName))
+                            {
                                 System.IO.File.Delete(fullName);
-                            using (FileStream fs = System.IO.File.Create(fullName)) { file.CopyTo(fs); fs.Flush(); }
+                            }
+#if !EJ2_DNX
+                            using (FileStream fs = System.IO.File.Create(fullName))
+                            {
+                                file.CopyTo(fs);
+                                fs.Flush();
+                            }
+#else
+                            file.SaveAs(fullName);
+#endif
                         }
                         else if (action == "keepboth")
                         {
@@ -923,9 +1240,20 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (index >= 0)
                                 newName = newName.Substring(0, index);
                             int fileCount = 0;
-                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name)))) { fileCount++; }
+                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
+                            {
+                                fileCount++;
+                            }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
-                            using (FileStream fs = System.IO.File.Create(newName)) { file.CopyTo(fs); fs.Flush(); }
+#if !EJ2_DNX
+                            using (FileStream fs = System.IO.File.Create(newName))
+                            {
+                                file.CopyTo(fs);
+                                fs.Flush();
+                            }
+#else
+                            file.SaveAs(newName);
+#endif
                         }
                     }
                 }
@@ -942,13 +1270,128 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + path + "' is not accessible. Access is denied." : e.Message.ToString();
-                er.Code = er.Message.Contains("Access is denied") ? "401" : "417";
+
+                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(path) + "' is not accessible. You need permission to perform the upload action." : e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
             }
         }
-        // Download file(s) or folder(s) from the file system
+#if SyncfusionFramework4_0
+        public virtual void Download(string path, string[] names, params FileManagerDirectoryContent[] data)
+        {
+            try
+            {
+                string physicalPath = GetPath(path);
+                String extension;
+                int count = 0;
+                for (var i = 0; i < names.Length; i++)
+                {
+                    bool IsFile = !IsDirectory(physicalPath, names[i]);
+                    AccessPermission FilePermission = GetPermission(physicalPath, names[i], IsFile);
+                    if (FilePermission != null && (!FilePermission.Read || !FilePermission.Download))
+                     throw new UnauthorizedAccessException("'" + this.getFileNameFromPath(this.rootName + path + names[i]) + "' is not accessible. You need permission to perform the download action.");
+
+                    extension = Path.GetExtension(names[i]);
+                    if (extension != "")
+                    {
+                        count++;
+                    }
+                }
+                if (names.Length > 1)
+                    DownloadZip(path, names);
+
+                if (count == names.Length)
+                {
+                    DownloadFile(path, names);
+                }
+
+            }
+            catch (Exception)
+            {
+
+            }
+        }
+
+        private FileStreamResult fileStreamResult;
+        protected virtual void DownloadFile(string path, string[] names = null)
+        {
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                try
+                {
+                    path = (Path.Combine(contentRootPath + path, names[0]));
+                    HttpResponse response = HttpContext.Current.Response;
+                    response.Buffer = true;
+                    response.Clear();
+                    response.ContentType = "APPLICATION/octet-stream";
+                    string extension = System.IO.Path.GetExtension(path);
+                    response.AddHeader("content-disposition", string.Format("attachment; filename = \"{0}\"", System.IO.Path.GetFileName(path)));
+                    response.WriteFile(path);
+                    response.Flush();
+                    response.End();
+                }
+                catch (Exception ex) { throw ex; }
+            }
+            else throw new ArgumentNullException("name should not be null");
+
+        }
+
+        protected virtual void DownloadZip(string path, string[] names)
+        {
+            HttpResponse response = HttpContext.Current.Response;
+            string tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
+
+            for (int i = 0; i < names.Count(); i++)
+            {
+                string fullPath = Path.Combine(contentRootPath + path, names[0]);
+                if (!string.IsNullOrEmpty(fullPath))
+                {
+                    try
+                    {
+                        var physicalPath = Path.Combine(contentRootPath + path, names[0]);
+                        AddFileToZip(tempPath, physicalPath);
+                    }
+                    catch (Exception ex) { throw ex; }
+                }
+                else throw new ArgumentNullException("name should not be null");
+            }
+            try
+            {
+                System.Net.WebClient net = new System.Net.WebClient();
+                response.ClearHeaders();
+                response.Clear();
+                response.Expires = 0;
+                response.Buffer = true;
+                response.AddHeader("Content-Disposition", "Attachment;FileName=Files.zip");
+                response.ContentType = "application/zip";
+                response.BinaryWrite(net.DownloadData(tempPath));
+                response.End();
+                if (System.IO.File.Exists(tempPath))
+                    System.IO.File.Delete(tempPath);
+            }
+            catch (Exception ex) { throw ex; }
+        }
+
+        protected virtual void AddFileToZip(string zipFileName, string fileToAdd)
+        {
+            using (Package zip = System.IO.Packaging.Package.Open(zipFileName, FileMode.OpenOrCreate))
+            {
+                string destFilename = ".\\" + Path.GetFileName(fileToAdd);
+                Uri uri = PackUriHelper.CreatePartUri(new Uri(destFilename, UriKind.Relative));
+                if (zip.PartExists(uri))
+                    zip.DeletePart(uri);
+                PackagePart pkgPart = zip.CreatePart(uri, System.Net.Mime.MediaTypeNames.Application.Zip, CompressionOption.Normal);
+                Byte[] bites = System.IO.File.ReadAllBytes(fileToAdd);
+                pkgPart.GetStream().Write(bites, 0, bites.Length);
+                zip.Close();
+            }
+        }
+
+#else
+
         public virtual FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             try
@@ -965,15 +1408,27 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
                     if ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory)
+                    {
                         count++;
+                    }
                 }
-                return (count == names.Length) ? DownloadFile(path, names) : DownloadFolder(path, names, count);
+                if (count == names.Length)
+                {
+                    return DownloadFile(path, names);
+                }
+                else
+                {
+                    return DownloadFolder(path, names, count);
+                }
             }
-            catch (Exception) { return null; }
+            catch (Exception)
+            {
+                return null;
+            }
         }
-        // Downloads the file
+
         private FileStreamResult fileStreamResult;
-        public virtual FileStreamResult DownloadFile(string path, string[] names = null)
+        protected virtual FileStreamResult DownloadFile(string path, string[] names = null)
         {
             try
             {
@@ -1000,7 +1455,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     string newFileName = fileName.Substring(36);
                     tempPath = Path.Combine(Path.GetTempPath(), newFileName);
                     if (System.IO.File.Exists(tempPath))
+                    {
                         System.IO.File.Delete(tempPath);
+                    }
                     string currentDirectory;
                     ZipArchiveEntry zipEntry;
                     ZipArchive archive;
@@ -1014,12 +1471,23 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                                 {
                                     currentDirectory = Path.Combine((contentRootPath + path), names[i]);
+
+#if SyncfusionFramework4_5
+                                    zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i]);
+#else
                                     zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
+#endif
                                 }
                             }
-                            catch (Exception) { return null; }
+                            catch (Exception)
+                            {
+                                return null;
+                            }
                         }
-                        else throw new ArgumentNullException("name should not be null");
+                        else
+                        {
+                            throw new ArgumentNullException("name should not be null");
+                        }
                     }
                     try
                     {
@@ -1027,32 +1495,48 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                         fileStreamResult.FileDownloadName = "files.zip";
                     }
-                    catch (Exception) { return null; }
+                    catch (Exception)
+                    {
+                        return null;
+                    }
                 }
                 if (File.Exists(tempPath))
+                {
                     File.Delete(tempPath);
+                }
                 return fileStreamResult;
             }
-            catch (Exception) { return null; }
+            catch (Exception)
+            {
+                return null;
+            }
         }
-        // Downloads the directories
         protected FileStreamResult DownloadFolder(string path, string[] names, int count)
         {
             try
             {
                 if (!String.IsNullOrEmpty(path))
+                {
                     path = Path.GetDirectoryName(path);
+                }
                 FileStreamResult fileStreamResult;
                 // create a temp.Zip file intially 
                 string tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
                 String fullPath;
                 if (File.Exists(tempPath))
+                {
                     File.Delete(tempPath);
+                }
                 if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
                     DirectoryInfo directoryName = new DirectoryInfo(fullPath);
+
+#if SyncfusionFramework4_5
+                    ZipFile.CreateFromDirectory(fullPath, tempPath);
+#else
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
+#endif
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                     fileStreamResult.FileDownloadName = directoryName.Name + ".zip";
@@ -1071,22 +1555,42 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             {
                                 string[] files = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
                                 if (files.Length == 0)
+                                {
                                     zipEntry = archive.CreateEntry(names[i] + "/");
+                                }
                                 else
                                 {
                                     foreach (string filePath in files)
                                     {
+#if SyncfusionFramework4_5
+                                    zipEntry = archive.CreateEntryFromFile(filePath, names[i] + filePath.Substring(currentDirectory.Length));
+#else
                                         zipEntry = archive.CreateEntryFromFile(filePath, names[i] + filePath.Substring(currentDirectory.Length), CompressionLevel.Fastest);
+#endif
+
                                     }
                                 }
                                 foreach (string filePath in Directory.GetDirectories(currentDirectory, "*", SearchOption.AllDirectories))
                                 {
                                     if (Directory.GetFiles(filePath).Length == 0)
+                                    {
+#if SyncfusionFramework4_5
+                                            zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, filePath), filePath.Substring(path.Length));
+#else
                                         zipEntry = archive.CreateEntry(names[i] + filePath.Substring(currentDirectory.Length) + "/");
+#endif
+                                    }
                                 }
                             }
                             else
+                            {
+#if SyncfusionFramework4_5
+                                    zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i]);
+#else
                                 zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i], CompressionLevel.Fastest);
+#endif
+
+                            }
                         }
                     }
                     FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
@@ -1094,29 +1598,46 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     fileStreamResult.FileDownloadName = "folders.zip";
                 }
                 if (File.Exists(tempPath))
+                {
                     File.Delete(tempPath);
+                }
                 return fileStreamResult;
             }
-            catch (Exception) { return null; }
+            catch (Exception)
+            {
+                return null;
+            }
         }
-        // Renames a directory
+
+#endif
         private string DirectoryRename(string newPath)
         {
             int directoryCount = 0;
-            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : ""))) { directoryCount++; }
-            return newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
+            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "")))
+            {
+                directoryCount++;
+            }
+            newPath = newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
+            return newPath;
         }
-        // Renames a File
+
         private string FileRename(string newPath, string fileName)
         {
             int name = newPath.LastIndexOf(".");
-            if (name >= 0) newPath = newPath.Substring(0, name);
+            if (name >= 0)
+            {
+                newPath = newPath.Substring(0, name);
+            }
             int fileCount = 0;
-            while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName)))) { fileCount++; }
-            return newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
+            while (System.IO.File.Exists(newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(fileName) : Path.GetExtension(fileName))))
+            {
+                fileCount++;
+            }
+            newPath = newPath + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(fileName);
+            return newPath;
         }
 
-        // Copies a directory
+
         private string DirectoryCopy(string sourceDirName, string destDirName)
         {
             string result = String.Empty;
@@ -1129,11 +1650,20 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 // If the destination directory doesn't exist, creates it.
                 if (!Directory.Exists(destDirName))
                 {
-                    try { Directory.CreateDirectory(destDirName); }
+                    try
+                    {
+                        Directory.CreateDirectory(destDirName);
+                    }
                     catch (Exception e)
                     {
-                        if (e.GetType().Name == "UnauthorizedAccessException") return destDirName;
-                        else throw e;
+                        if (e.GetType().Name == "UnauthorizedAccessException")
+                        {
+                            return destDirName;
+                        }
+                        else
+                        {
+                            throw e;
+                        }
                     }
                 }
 
@@ -1149,26 +1679,43 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     }
                     catch (Exception e)
                     {
-                        if (e.GetType().Name == "UnauthorizedAccessException") return file.FullName;
-                        else throw e;
+                        if (e.GetType().Name == "UnauthorizedAccessException")
+                        {
+                            return file.FullName;
+                        }
+                        else
+                        {
+                            throw e;
+                        }
                     }
                 }
                 foreach (DirectoryInfo direc in dirs)
                 {
-                    result = DirectoryCopy(Path.Combine(sourceDirName, direc.Name), Path.Combine(destDirName, direc.Name));
-                    if (result != String.Empty) return result;
+                    string oldPath = Path.Combine(sourceDirName, direc.Name);
+                    string temppath = Path.Combine(destDirName, direc.Name);
+                    result = DirectoryCopy(oldPath, temppath);
+                    if (result != String.Empty)
+                    {
+                        return result;
+                    }
                 }
                 return result;
             }
             catch (Exception e)
             {
-                if (e.GetType().Name == "UnauthorizedAccessException") return sourceDirName;
-                else throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException")
+                {
+                    return sourceDirName;
+                }
+                else
+                {
+                    throw e;
+                }
             }
         }
 
-        // Deletes a directory
-        public virtual string DeleteDirectory(string path)
+
+        protected virtual string DeleteDirectory(string path)
         {
             try
             {
@@ -1184,27 +1731,41 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     }
                     catch (Exception e)
                     {
-                        if (e.GetType().Name == "UnauthorizedAccessException") return file;
-                        else throw e;
+                        if (e.GetType().Name == "UnauthorizedAccessException")
+                        {
+                            return file;
+                        }
+                        else
+                        {
+                            throw e;
+                        }
                     }
                 }
                 foreach (string dir in dirs)
                 {
                     result = DeleteDirectory(dir);
                     if (result != String.Empty)
+                    {
                         return result;
+                    }
                 }
                 Directory.Delete(path, true);
                 return result;
             }
             catch (Exception e)
             {
-                if (e.GetType().Name == "UnauthorizedAccessException") return path;
-                else throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException")
+                {
+                    return path;
+                }
+                else
+                {
+                    throw e;
+                }
+
             }
         }
-        // Returns the file details
-        public virtual FileManagerDirectoryContent GetFileDetails(string path)
+        protected virtual FileManagerDirectoryContent GetFileDetails(string path)
         {
             try
             {
@@ -1213,7 +1774,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 FileInfo detailPath = new FileInfo(info.FullName);
                 int folderLength = 0;
                 bool isFile = ((attr & FileAttributes.Directory) == FileAttributes.Directory) ? false : true;
-                if (!isFile) folderLength = detailPath.Directory.GetDirectories().Length;
+                if (!isFile)
+                {
+                    folderLength = detailPath.Directory.GetDirectories().Length;
+                }
                 string filterPath = GetRelativePath(this.contentRootPath, info.DirectoryName + Path.DirectorySeparatorChar);
                 return new FileManagerDirectoryContent
                 {
@@ -1228,135 +1792,155 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     Permission = GetPermission(GetPath(filterPath), info.Name, isFile)
                 };
             }
-            catch (Exception e) { throw e; }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
-        public virtual AccessPermission GetPermission(string location, string name, bool isFile)
+        protected virtual AccessPermission GetPermission(string location, string name, bool isFile)
         {
             AccessPermission FilePermission = new AccessPermission();
             if (isFile)
             {
-                if (this.AccessDetails.FileRules == null) return null;
+                if (this.AccessDetails.AccessRules == null) return null;
                 string nameExtension = Path.GetExtension(name).ToLower();
                 string fileName = Path.GetFileNameWithoutExtension(name);
                 string currentPath = GetFilePath(location + name);
-                foreach (FileRule fileRule in AccessDetails.FileRules)
+                foreach (AccessRule fileRule in AccessDetails.AccessRules)
                 {
-                    if (!string.IsNullOrEmpty(fileRule.Path) && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
+                    if (!string.IsNullOrEmpty(fileRule.Path) && fileRule.IsFile && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
                     {
                         if (fileRule.Path.IndexOf("*.*") > -1)
                         {
                             string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*.*"));
                             if (currentPath.IndexOf(GetPath(parentPath)) == 0 || parentPath == "")
+                            {
                                 FilePermission = UpdateFileRules(FilePermission, fileRule);
+                            }
                         }
                         else if (fileRule.Path.IndexOf("*.") > -1)
                         {
                             string pathExtension = Path.GetExtension(fileRule.Path).ToLower();
                             string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*."));
                             if ((GetPath(parentPath) == currentPath || parentPath == "") && nameExtension == pathExtension)
+                            {
                                 FilePermission = UpdateFileRules(FilePermission, fileRule);
+                            }
                         }
                         else if (fileRule.Path.IndexOf(".*") > -1)
                         {
                             string pathName = Path.GetFileNameWithoutExtension(fileRule.Path);
                             string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf(pathName + ".*"));
                             if ((GetPath(parentPath) == currentPath || parentPath == "") && fileName == pathName)
+                            {
                                 FilePermission = UpdateFileRules(FilePermission, fileRule);
+                            }
                         }
                         else if (GetPath(fileRule.Path) == GetValidPath(location + name))
+                        {
                             FilePermission = UpdateFileRules(FilePermission, fileRule);
+                        }
                     }
                 }
                 return FilePermission;
             }
             else
             {
-                if (this.AccessDetails.FolderRules == null) { return null; }
-                foreach (FolderRule folderRule in AccessDetails.FolderRules)
+                if (this.AccessDetails.AccessRules == null) { return null; }
+                foreach (AccessRule folderRule in AccessDetails.AccessRules)
                 {
-                    if (folderRule.Path != null && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
+                    if (folderRule.Path != null && folderRule.IsFile == false && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
                     {
                         if (folderRule.Path.IndexOf("*") > -1)
                         {
                             string parentPath = folderRule.Path.Substring(0, folderRule.Path.IndexOf("*"));
                             if (GetValidPath(location + name).IndexOf(GetPath(parentPath)) == 0 || parentPath == "")
+                            {
                                 FilePermission = UpdateFolderRules(FilePermission, folderRule);
+                            }
                         }
                         else if (GetPath(folderRule.Path) == GetValidPath(location + name) || GetPath(folderRule.Path) == GetValidPath(location + name + Path.DirectorySeparatorChar))
+                        {
                             FilePermission = UpdateFolderRules(FilePermission, folderRule);
+                        }
                         else if (GetValidPath(location + name).IndexOf(GetPath(folderRule.Path)) == 0)
                         {
-                            FilePermission.Edit = HasPermission(folderRule.EditContents);
-                            FilePermission.EditContents = HasPermission(folderRule.EditContents);
+                            FilePermission.Write = HasPermission(folderRule.WriteContents);
+                            FilePermission.WriteContents = HasPermission(folderRule.WriteContents);
                         }
                     }
                 }
                 return FilePermission;
             }
         }
-        public virtual string GetPath(string path)
+        protected virtual string GetPath(string path)
         {
             String fullPath = (this.contentRootPath + path);
             DirectoryInfo directory = new DirectoryInfo(fullPath);
             return directory.FullName;
         }
-        public virtual string GetValidPath(string path)
+        protected virtual string GetValidPath(string path)
         {
             DirectoryInfo directory = new DirectoryInfo(path);
             return directory.FullName;
         }
-        public virtual string GetFilePath(string path)
+        protected virtual string GetFilePath(string path)
         {
             return Path.GetDirectoryName(path) + Path.DirectorySeparatorChar;
         }
-        public virtual string[] GetFolderDetails(string path)
+        protected virtual string[] GetFolderDetails(string path)
         {
             string[] str_array = path.Split('/'), fileDetails = new string[2];
             string parentPath = "";
-            for (int i = 0; i < str_array.Length - 2; i++) { parentPath += str_array[i] + "/"; }
+            for (int i = 0; i < str_array.Length - 2; i++)
+            {
+                parentPath += str_array[i] + "/";
+            }
             fileDetails[0] = parentPath;
             fileDetails[1] = str_array[str_array.Length - 2];
             return fileDetails;
         }
-        public virtual AccessPermission GetPathPermission(string path)
+        protected virtual AccessPermission GetPathPermission(string path)
         {
             string[] fileDetails = GetFolderDetails(path);
             return GetPermission(GetPath(fileDetails[0]), fileDetails[1], false);
         }
-        public virtual AccessPermission GetFilePermission(string path)
+        protected virtual AccessPermission GetFilePermission(string path)
         {
             string parentPath = path.Substring(0, path.LastIndexOf("/") + 1);
             string fileName = Path.GetFileName(path);
             return GetPermission(GetPath(parentPath), fileName, true);
         }
-        public virtual bool IsDirectory(string path, string fileName)
+        protected virtual bool IsDirectory(string path, string fileName)
         {
             String fullPath = Path.Combine(path, fileName);
             return ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
         }
-        public virtual bool HasPermission(Permission rule)
+        protected virtual bool HasPermission(Permission rule)
         {
             return rule == Permission.Allow ? true : false;
         }
-        public virtual AccessPermission UpdateFileRules(AccessPermission filePermission, FileRule fileRule)
+        protected virtual AccessPermission UpdateFileRules(AccessPermission filePermission, AccessRule fileRule)
         {
             filePermission.Copy = HasPermission(fileRule.Copy);
             filePermission.Download = HasPermission(fileRule.Download);
-            filePermission.Edit = HasPermission(fileRule.Edit);
+            filePermission.Write = HasPermission(fileRule.Write);
             filePermission.Read = HasPermission(fileRule.Read);
+            filePermission.Message = string.IsNullOrEmpty(fileRule.Message) ? string.Empty : fileRule.Message;
             return filePermission;
         }
-        public virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, FolderRule folderRule)
+        protected virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, AccessRule folderRule)
         {
             folderPermission.Copy = HasPermission(folderRule.Copy);
             folderPermission.Download = HasPermission(folderRule.Download);
-            folderPermission.Edit = HasPermission(folderRule.Edit);
-            folderPermission.EditContents = HasPermission(folderRule.EditContents);
+            folderPermission.Write = HasPermission(folderRule.Write);
+            folderPermission.WriteContents = HasPermission(folderRule.WriteContents);
             folderPermission.Read = HasPermission(folderRule.Read);
             folderPermission.Upload = HasPermission(folderRule.Upload);
+            folderPermission.Message = string.IsNullOrEmpty(folderRule.Message) ? string.Empty : folderRule.Message;
             return folderPermission;
         }
-        public virtual bool parentsHavePermission(FileManagerDirectoryContent fileDetails)
+        protected virtual bool parentsHavePermission(FileManagerDirectoryContent fileDetails)
         {
             String parentPath = fileDetails.FilterPath.Replace(Path.DirectorySeparatorChar, '/');
             String[] parents = parentPath.Split('/');
@@ -1366,7 +1950,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 currPath = (parents[i] == "") ? currPath : (currPath + parents[i] + "/");
                 AccessPermission PathPermission = GetPathPermission(currPath);
-                if (PathPermission == null) break;
+                if (PathPermission == null)
+                {
+                    break;
+                }
                 else if (PathPermission != null && !PathPermission.Read)
                 {
                     hasPermission = false;
@@ -1377,7 +1964,23 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         }
         public string ToCamelCase(FileManagerResponse userData)
         {
-            return JsonConvert.SerializeObject(userData, new JsonSerializerSettings { ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() } });
+            return JsonConvert.SerializeObject(userData, new JsonSerializerSettings
+            {
+#if EJ2_DNX
+                ContractResolver = new CamelCasePropertyNamesContractResolver()
+
+#else
+                ContractResolver = new DefaultContractResolver
+                {
+                    NamingStrategy = new CamelCaseNamingStrategy()
+                }
+#endif
+            });
+        }
+
+        FileStreamResult FileProviderBase.Download(string path, string[] names, params FileManagerDirectoryContent[] data)
+        {
+            throw new NotImplementedException();
         }
 
         private bool CheckChild(string path)
@@ -1391,8 +1994,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
             catch (Exception e)
             {
-                if (e.GetType().Name == "UnauthorizedAccessException") hasChild = false;
-                else throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException")
+                {
+                    hasChild = false;
+                }
+                else
+                {
+                    throw e;
+                }
             }
             return hasChild;
         }
@@ -1407,8 +2016,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
             catch (Exception e)
             {
-                if (e.GetType().Name == "UnauthorizedAccessException") hasAcceess = false;
-                else throw e;
+                if (e.GetType().Name == "UnauthorizedAccessException")
+                {
+                    hasAcceess = false;
+                }
+                else
+                {
+                    throw e;
+                }
             }
             return hasAcceess;
         }
@@ -1416,12 +2031,21 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             try
             {
-                foreach (DirectoryInfo subdir in dir.GetDirectories()) { size = GetDirectorySize(subdir, size); }
-                foreach (FileInfo file in dir.GetFiles()) { size += file.Length; }
+                foreach (DirectoryInfo subdir in dir.GetDirectories())
+                {
+                    size = GetDirectorySize(subdir, size);
+                }
+                foreach (FileInfo file in dir.GetFiles())
+                {
+                    size += file.Length;
+                }
             }
             catch (Exception e)
             {
-                if (e.GetType().Name != "UnauthorizedAccessException") throw e;
+                if (e.GetType().Name != "UnauthorizedAccessException")
+                {
+                    throw e;
+                }
             }
             return size;
         }
@@ -1429,12 +2053,21 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             try
             {
-                foreach (DirectoryInfo subdir in dir.GetDirectories()) { files = GetDirectoryFiles(subdir, files); }
-                foreach (FileInfo file in dir.GetFiles()) { files.Add(file); }
+                foreach (DirectoryInfo subdir in dir.GetDirectories())
+                {
+                    files = GetDirectoryFiles(subdir, files);
+                }
+                foreach (FileInfo file in dir.GetFiles())
+                {
+                    files.Add(file);
+                }
             }
             catch (Exception e)
             {
-                if (e.GetType().Name != "UnauthorizedAccessException") throw e;
+                if (e.GetType().Name != "UnauthorizedAccessException")
+                {
+                    throw e;
+                }
             }
             return files;
         }
@@ -1442,11 +2075,29 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             try
             {
-                foreach (DirectoryInfo subdir in dir.GetDirectories()) { files = GetDirectoryFolders(subdir, files); }
-                foreach (DirectoryInfo file in dir.GetDirectories()) { files.Add(file); }
+                foreach (DirectoryInfo subdir in dir.GetDirectories())
+                {
+                    files = GetDirectoryFolders(subdir, files);
+                }
+                foreach (DirectoryInfo file in dir.GetDirectories())
+                {
+                    files.Add(file);
+                }
             }
-            catch (Exception e) { if (e.GetType().Name != "UnauthorizedAccessException") throw e; }
+            catch (Exception e)
+            {
+                if (e.GetType().Name != "UnauthorizedAccessException")
+                {
+                    throw e;
+                }
+            }
             return files;
         }
+        private string getFileNameFromPath(string path)
+        {
+            int index = path.LastIndexOf("/");
+            return path.Substring(index + 1);
+        }
+
     }
 }
