@@ -17,10 +17,10 @@ node('AspComponents') {
 
             stage('Build') {
                   // Compile ASP.Net Core Build
-                runShell('dotnet restore ./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj');
-                //runShell('gulp change-nuspec --nuspec "./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.nuspec"');
-                runShell('dotnet build ./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj /p:Configuration=Debug');
-                //deployPackage('Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.nuspec');
+                runShell('dotnet restore ./EJ2ASPCoreFileProvider.csproj');
+                //runShell('gulp change-nuspec --nuspec "./EJ2ASPCoreFileProvider.nuspec"');
+                runShell('dotnet build ./EJ2ASPCoreFileProvider.csproj /p:Configuration=Debug');
+                //deployPackage('EJ2ASPCoreFileProvider.nuspec');
                 runShell('gulp clean && git reset --hard');
 
             }
