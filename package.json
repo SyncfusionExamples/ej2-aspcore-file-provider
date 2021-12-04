@@ -7,19 +7,28 @@
         "url": "https://gitlab.syncfusion.com/essential-studio/ej2-azure-aspcore-file-provider"
     },
     "keywords": [
-        "ej2",
-        "ej2-web-services",
-        "ej2-file-manager",
-        "azure"
-    ],
-    "author": "Syncfusion Inc.",
-    "scripts": {
-        "build": "gulp aspcore-build",
-        "publish": "gulp azure-core-publish"
-    },
-    "devDependencies": {
-        "@syncfusion/ej2-staging": "*",
-       	"gulp": "^4.0.2",
-        "vinyl-ftp": "^0.6.1"
-    }
+		"ej2",
+		"ej2-asp",
+		"ej2-asp-core"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://gitlab.syncfusion.com/essential-studio/ej2-azure-aspcore-file-provider.git"
+	},
+	"dependencies": {
+		"gulp": "^4.0.2",
+		"gulp-dotnet-cli": "^1.0.2",
+		"require-dir": "^0.3.2",
+		"shelljs": "^0.7.0",
+		"simple-git": "^1.43.0"
+	},
+	"config": {
+		"ghooks": {
+			"build": "gulp build"
+		}
+	},
+	"scripts": {
+		"build": "gulp build",
+		"publish": "gulp publish-nuget"
+	}
 }
