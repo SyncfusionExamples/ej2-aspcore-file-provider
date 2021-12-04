@@ -4,26 +4,23 @@ node('AspComponents') {
     try {
         deleteDir();
         stage('Checkout') {
-              git url: 'http://gitlab.syncfusion.com/essential-studio/ej2-groovy-scripts.git', branch: 'master', credentialsId: env.JENKINS_CREDENTIAL_ID;
+              git url: 'http://github.com/essential-studio/ej2-groovy-scripts.git', branch: 'master', credentialsId: env.GithubCredentialID;
               shared = load 'src/shared.groovy';
             checkout scm;
         }
 
         if(checkCommitMessage()) {
             stage('Install') {
-                runShell('git config --global user.email "essentialjs2@syncfusion.com"');
-                runShell('git config --global user.name "essentialjs2"');
-                runShell('git config --global core.longpaths true');
-                runShell('npm -v');
-                runShell('npm install');
+                shared.install();
+                shared.sdkInstall();
             }
 
             stage('Build') {
                   // Compile ASP.Net Core Build
-                runShell('dotnet restore ./EJ2ASPCoreFileProvider.csproj');
-                //runShell('gulp change-nuspec --nuspec "./EJ2ASPCoreFileProvider.nuspec"');
-                runShell('dotnet build ./EJ2ASPCoreFileProvider.csproj /p:Configuration=Debug');
-                //deployPackage('EJ2ASPCoreFileProvider.nuspec');
+                runShell('dotnet restore ./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj');
+                //runShell('gulp change-nuspec --nuspec "./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.nuspec"');
+                runShell('dotnet build ./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj /p:Configuration=Debug');
+                //deployPackage('Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.nuspec');
                 runShell('gulp clean && git reset --hard');
 
             }

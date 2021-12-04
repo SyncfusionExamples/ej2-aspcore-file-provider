@@ -10,25 +10,25 @@ var isReleaseBranch = /^((release\/|hotfix\/))/g.test(process.env.BRANCH_NAME);
 
 
 gulp.task('clean', () => {
-    return gulp.src(['./EJ2ASPCoreFileProvider.csproj'], { read: false })
+    return gulp.src(['./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj'], { read: false })
         .pipe(clean());
 });
 
-gulp.task('restore', ['clean'], () => {
-    return gulp.src(['./EJ2ASPCoreFileProvider.csproj'], { read: false })
+gulp.task('restore',gulp.series('clean'), () => {
+    return gulp.src(['./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj'], { read: false })
         .pipe(restore({ echo: true }));
 });
 
-gulp.task('build', ['restore'], () => {
-    return gulp.src(['./EJ2ASPCoreFileProvider.csproj'], { read: false })
+gulp.task('build', gulp.series('restore'), () => {
+    return gulp.src(['./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj'], { read: false })
         .pipe(build({ configuration: 'Release', version: '1.0.0', echo: true }));
 });
 
-gulp.task('ls-log', ['build'], () => {
+gulp.task('ls-log', gulp.series('build'), () => {
 return null;
 });
 
-gulp.task('ci-report', ['ls-log'], () => {
+gulp.task('ci-report',gulp.series('ls-log'), () => {
     return null;
     });
 
@@ -38,9 +38,9 @@ gulp.task('generate-nuget', function(done) {
     var version = fs.readFileSync('./version.txt', 'utf8');
     console.log(version);
     //ASP Core Nuget
-    shelljs.exec('dotnet restore "./EJ2ASPCoreFileProvider.csproj"  --configfile "NuGet.config"');
-    shelljs.exec('dotnet build "./EJ2ASPCoreFileProvider.csproj" --verbosity "m" --configuration  "Release-XML"');
-    shelljs.exec(`dotnet pack "./EJ2ASPCoreFileProvider.csproj" -c Release --output NuGet${version}`);
+    shelljs.exec('dotnet restore "./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj"  --configfile "NuGet.config"');
+    shelljs.exec('dotnet build "./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj" --verbosity "m" --configuration  "Release-XML"');
+    shelljs.exec(`dotnet pack "./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj" -c Release --output NuGet${version}`);
     shelljs.exec('gulp clean');
     done();
 });
@@ -49,7 +49,7 @@ console.log(nupkgPath);
 gulp.task('local-pack', () => {
     var packJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
     var nugetVersion = packJson.version;
-    return gulp.src('./EJ2ASPCoreFileProvider.csproj')
+    return gulp.src('./Syncfusion.EJ2.FileManager.AzureFileProvider.AspNet.Core.csproj')
         .pipe(restore())
         .pipe(build())
         .pipe(pack({
@@ -114,8 +114,9 @@ gulp.task('ci-skip', function(done) {
     });
 });
 
-gulp.task('clean', function() {
+gulp.task('clean', function(done) {
     shelljs.rm('-rf', './src/bin/');
     shelljs.rm('-rf', './src/obj/');
     shelljs.rm('-rf', './bin/');
+    done();
 });
