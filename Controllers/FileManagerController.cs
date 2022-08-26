@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Syncfusion.EJ2.FileManager.Base;
+using System.IO;
 
 namespace EJ2APIServices.Controllers
 {
@@ -72,6 +73,23 @@ namespace EJ2APIServices.Controllers
         public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
         {
             FileManagerResponse uploadResponse;
+            foreach (var file in uploadFiles)
+            {
+                var folders = (file.FileName).Split('/');
+                // checking the folder upload
+                if (folders.Length > 1)
+                {
+                    for (var i = 0; i < folders.Length - 1; i++)
+                    {
+                        string newDirectoryPath = Path.Combine(this.basePath + path, folders[i]);
+                        if (!Directory.Exists(newDirectoryPath))
+                        {
+                            this.operation.ToCamelCase(this.operation.Create(path, folders[i]));
+                        }
+                        path += folders[i] + "/";
+                    }
+                }
+            }
             uploadResponse = operation.Upload(path, uploadFiles, action, null);
             if (uploadResponse.Error != null)
             {
