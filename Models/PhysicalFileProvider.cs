@@ -1182,7 +1182,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         var fullName = Path.Combine((this.contentRootPath + path), name);
 #else
                         var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim().ToString();
-                        var fullName = Path.Combine((this.contentRootPath + path), name);
+                        string[] folders = name.Split('/');
+                        string fileName = folders[folders.Length - 1];
+                        var fullName = Path.Combine((this.contentRootPath + path), fileName);
 #endif
                         if (action == "save")
                         {
