@@ -20,7 +20,7 @@ namespace EJ2APIServices.Controllers
         public PhysicalFileProvider operation;
         public string basePath;
         string root = "wwwroot\\Files";
-        public FileManagerController(IHostingEnvironment hostingEnvironment)
+        public FileManagerController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
