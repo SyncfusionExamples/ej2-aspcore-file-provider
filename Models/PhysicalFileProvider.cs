@@ -1496,6 +1496,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                                 {
                                     currentDirectory = Path.Combine((contentRootPath + path), names[i]);
+                                    currentDirectory = currentDirectory.Replace("..", "");
 
 #if SyncfusionFramework4_5
                                     zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i]);
