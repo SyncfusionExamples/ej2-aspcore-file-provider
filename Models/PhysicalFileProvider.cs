@@ -65,7 +65,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     path = string.Empty;
                 }
                 String fullPath = (contentRootPath + path);
-                fullPath = fullPath.Replace("..", "");
+                fullPath = fullPath.Replace("../", "");
                 DirectoryInfo directory = new DirectoryInfo(fullPath);
                 string[] extensions = this.allowedExtension;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
@@ -246,7 +246,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
 
                 string newDirectoryPath = Path.Combine(contentRootPath + path, name);
-                newDirectoryPath = newDirectoryPath.Replace("..", "");
+                newDirectoryPath = newDirectoryPath.Replace("../", "");
 
                 bool directoryExist = Directory.Exists(newDirectoryPath);
 
@@ -308,7 +308,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     else
                     {
                         fullPath = Path.Combine(contentRootPath + path, names[0]);
-                        fullPath = fullPath.Replace("..", "");
+                        fullPath = fullPath.Replace("../", "");
                     }
                     string physicalPath = GetPath(path);
                     DirectoryInfo directory = new DirectoryInfo(fullPath);
@@ -345,7 +345,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         else
                         {
                             fullPath = Path.Combine(contentRootPath + path, names[i]);
-                            fullPath = fullPath.Replace("..", "");
+                            fullPath = fullPath.Replace("../", "");
                         }
                         FileInfo info = new FileInfo(fullPath);
                         fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName = previousName + ", " + data[i].Name;
@@ -400,7 +400,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 for (int i = 0; i < names.Length; i++)
                 {
                     string fullPath = Path.Combine((contentRootPath + path), names[i]);
-                    fullPath = fullPath.Replace("..", "");
+                    fullPath = fullPath.Replace("../", "");
                     DirectoryInfo directory = new DirectoryInfo(fullPath);
                     if (!string.IsNullOrEmpty(names[i]))
                     {
@@ -483,7 +483,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
 
                 string tempPath = (contentRootPath + path);
-                tempPath = tempPath.Replace("..", "");
+                tempPath = tempPath.Replace("../", "");
                 string oldPath = Path.Combine(tempPath, name);
                 string newPath = Path.Combine(tempPath, newName);
                 FileAttributes attr = File.GetAttributes(oldPath);
@@ -591,16 +591,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         path = tempPath;
                     }
                     string itemPath = Path.Combine(contentRootPath + path, names[i]);
-                    itemPath = itemPath.Replace("..", "");
+                    itemPath = itemPath.Replace("../", "");
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
                         if ((File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory)
                         {
                             string directoryName = names[i];
                             string oldPath = Path.Combine(contentRootPath + path, directoryName);
-                            oldPath = oldPath.Replace("..", "");
+                            oldPath = oldPath.Replace("../", "");
                             string newPath = Path.Combine(contentRootPath + targetPath, directoryName);
-                            newPath = newPath.Replace("..", "");
+                            newPath = newPath.Replace("../", "");
                             bool exist = Directory.Exists(newPath);
                             if (exist)
                             {
@@ -636,9 +636,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         {
                             string fileName = names[i];
                             string oldPath = Path.Combine(contentRootPath + path, fileName);
-                            oldPath = oldPath.Replace("..", "");
+                            oldPath = oldPath.Replace("../", "");
                             string newPath = Path.Combine(contentRootPath + targetPath, fileName);
-                            newPath = newPath.Replace("..", "");
+                            newPath = newPath.Replace("../", "");
                             bool fileExist = System.IO.File.Exists(newPath);
                             try
                             {
@@ -785,16 +785,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         path = tempPath;
                     }
                     string itemPath = Path.Combine(contentRootPath + path, names[i]);
-                    itemPath = itemPath.Replace("..", "");
+                    itemPath = itemPath.Replace("../", "");
                     if (Directory.Exists(itemPath) || File.Exists(itemPath))
                     {
                         if ((File.GetAttributes(itemPath) & FileAttributes.Directory) == FileAttributes.Directory)
                         {
                             string directoryName = names[i];
                             string oldPath = Path.Combine(contentRootPath + path, directoryName);
-                            oldPath = oldPath.Replace("..", "");
+                            oldPath = oldPath.Replace("../", "");
                             string newPath = Path.Combine(contentRootPath + targetPath, directoryName);
-                            newPath = newPath.Replace("..", "");
+                            newPath = newPath.Replace("../", "");
                             bool exist = Directory.Exists(newPath);
                             if (exist)
                             {
@@ -842,9 +842,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         {
                             string fileName = names[i];
                             string oldPath = Path.Combine(contentRootPath + path, fileName);
-                            oldPath = oldPath.Replace("..", "");
+                            oldPath = oldPath.Replace("../", "");
                             string newPath = Path.Combine(contentRootPath + targetPath, fileName);
-                            newPath = newPath.Replace("..", "");
+                            newPath = newPath.Replace("../", "");
                             bool fileExist = File.Exists(newPath);
                             try
                             {
@@ -1086,7 +1086,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (PathPermission != null && !PathPermission.Read)
                     return null;
                 String fullPath = (contentRootPath + path);
-                fullPath = fullPath.Replace("..", "");
+                fullPath = fullPath.Replace("../", "");
 #if EJ2_DNX
                 if (allowCompress)
                 {
@@ -1202,7 +1202,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         string[] folders = name.Split('/');
                         string fileName = folders[folders.Length - 1];
                         var fullName = Path.Combine((this.contentRootPath + path), fileName);
-                        fullName = fullName.Replace("..", "");
+                        fullName = fullName.Replace("../", "");
 #endif
                         if (action == "save")
                         {
@@ -1427,7 +1427,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
 
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
-                    fullPath = fullPath.Replace("..", "");
+                    fullPath = fullPath.Replace("../", "");
                     if ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory)
                     {
                         count++;
@@ -1459,7 +1459,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names == null || names.Length == 0)
                 {
                     fullPath = (contentRootPath + path);
-                    fullPath = fullPath.Replace("..", "");
+                    fullPath = fullPath.Replace("../", "");
                     byte[] bytes = System.IO.File.ReadAllBytes(fullPath);
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
@@ -1467,7 +1467,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 else if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    fullPath = fullPath.Replace("..", "");
+                    fullPath = fullPath.Replace("../", "");
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                     fileStreamResult.FileDownloadName = names[0];
@@ -1477,7 +1477,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     string fileName = Guid.NewGuid().ToString() + "temp.zip";
                     string newFileName = fileName.Substring(36);
                     tempPath = Path.Combine(Path.GetTempPath(), newFileName);
-                    tempPath = tempPath.Replace("..", "");
+                    tempPath = tempPath.Replace("../", "");
                     if (System.IO.File.Exists(tempPath))
                     {
                         System.IO.File.Delete(tempPath);
@@ -1488,7 +1488,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     for (int i = 0; i < names.Count(); i++)
                     {
                         fullPath = Path.Combine((contentRootPath + path), names[i]);
-                        fullPath = fullPath.Replace("..", "");
+                        fullPath = fullPath.Replace("../", "");
                         if (!string.IsNullOrEmpty(fullPath))
                         {
                             try
@@ -1496,7 +1496,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 using (archive = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                                 {
                                     currentDirectory = Path.Combine((contentRootPath + path), names[i]);
-                                    currentDirectory = currentDirectory.Replace("..", "");
+                                    currentDirectory = currentDirectory.Replace("../", "");
 
 #if SyncfusionFramework4_5
                                     zipEntry = archive.CreateEntryFromFile(Path.Combine(this.contentRootPath, currentDirectory), names[i]);
@@ -1556,7 +1556,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    fullPath = fullPath.Replace("..", "");
+                    fullPath = fullPath.Replace("../", "");
                     DirectoryInfo directoryName = new DirectoryInfo(fullPath);
 
 #if SyncfusionFramework4_5
@@ -1578,7 +1578,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         for (int i = 0; i < names.Length; i++)
                         {
                             currentDirectory = Path.Combine((contentRootPath + path), names[i]);
-                            currentDirectory = currentDirectory.Replace("..", "");
+                            currentDirectory = currentDirectory.Replace("../", "");
                             if ((File.GetAttributes(currentDirectory) & FileAttributes.Directory) == FileAttributes.Directory)
                             {
                                 string[] files = Directory.GetFiles(currentDirectory, "*.*", SearchOption.AllDirectories);
@@ -1702,9 +1702,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     try
                     {
                         string oldPath = Path.Combine(sourceDirName, file.Name);
-                        oldPath = oldPath.Replace("..", "");
+                        oldPath = oldPath.Replace("../", "");
                         string temppath = Path.Combine(destDirName, file.Name);
-                        temppath = temppath.Replace("..", "");
+                        temppath = temppath.Replace("../", "");
                         File.Copy(oldPath, temppath);
                     }
                     catch (Exception e)
@@ -1722,9 +1722,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 foreach (DirectoryInfo direc in dirs)
                 {
                     string oldPath = Path.Combine(sourceDirName, direc.Name);
-                    oldPath = oldPath.Replace("..", "");
+                    oldPath = oldPath.Replace("../", "");
                     string temppath = Path.Combine(destDirName, direc.Name);
-                    temppath = temppath.Replace("..", "");
+                    temppath = temppath.Replace("../", "");
                     result = DirectoryCopy(oldPath, temppath);
                     if (result != String.Empty)
                     {
@@ -1908,7 +1908,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected virtual string GetPath(string path)
         {
             String fullPath = (this.contentRootPath + path);
-            fullPath = fullPath.Replace("..", "");
+            fullPath = fullPath.Replace("../", "");
             DirectoryInfo directory = new DirectoryInfo(fullPath);
             return directory.FullName;
         }
@@ -1947,7 +1947,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected virtual bool IsDirectory(string path, string fileName)
         {
             String fullPath = Path.Combine(path, fileName);
-            fullPath = fullPath.Replace("..", "");
+            fullPath = fullPath.Replace("../", "");
             return ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
         }
         protected virtual bool HasPermission(Permission rule)
