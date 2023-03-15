@@ -6,7 +6,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Syncfusion.EJ2.FileManager.Base;
+using Syncfusion.FileManager.Base;
 
 
 #if EJ2_DNX
@@ -22,7 +22,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Net.Http.Headers;
 #endif
 
-namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
+namespace Syncfusion.FileManager.PhysicalFileProvider
 {
     public class PhysicalFileProvider : PhysicalFileProviderBase
     {

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Syncfusion.EJ2.FileManager.Base
+namespace Syncfusion.FileManager.Base
 {
     public class FileDetails
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 
 
-namespace Syncfusion.EJ2.FileManager.Base
+namespace Syncfusion.FileManager.Base
 {
     public class FileManagerDirectoryContent
     {
