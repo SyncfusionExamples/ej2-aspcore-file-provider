@@ -51,6 +51,8 @@ namespace Syncfusion.EJ2.FileManager.Base
 
         public bool ShowHiddenItems { get; set; }
 
+        public bool ShowFileExtension { get; set; }
+
         public FileManagerDirectoryContent[] Data { get; set; }
 
         public FileManagerDirectoryContent TargetData { get; set; }

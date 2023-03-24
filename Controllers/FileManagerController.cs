@@ -63,7 +63,7 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive));
                 case "rename":
                     // renames a file or folder.
-                    return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName));
+                    return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName, false, args.ShowFileExtension, args.Data));
             }
             return null;
         }
