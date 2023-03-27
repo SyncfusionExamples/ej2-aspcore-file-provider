@@ -468,12 +468,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
         }
 
-        public virtual FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Rename(string path, string name, string newName, bool replace = false, bool showFileExtension = true, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse renameResponse = new FileManagerResponse();
             try
             {
                 string physicalPath = GetPath(path);
+                if (!showFileExtension)
+                {
+                    name = name + data[0].Type;
+                    newName = newName + data[0].Type;
+                }
                 bool IsFile = !IsDirectory(physicalPath, name);
                 AccessPermission permission = GetPermission(physicalPath, name, IsFile);
                 if (permission != null && (!permission.Read || !permission.Write))
