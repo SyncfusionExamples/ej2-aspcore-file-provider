@@ -5,7 +5,7 @@ using System.Linq;
 using System.Web;
 #endif
 
-namespace Syncfusion.FileManager.Base
+namespace Syncfusion.EJ2.FileManager.Base
 {
     public class AccessDetails
     {

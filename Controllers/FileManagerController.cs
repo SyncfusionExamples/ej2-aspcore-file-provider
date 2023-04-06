@@ -1,4 +1,4 @@
-﻿using Syncfusion.FileManager.PhysicalFileProvider;
+﻿using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using Syncfusion.FileManager.Base;
+using Syncfusion.EJ2.FileManager.Base;
 using System.IO;
 
-namespace APIServices.Controllers
+namespace EJ2APIServices.Controllers
 {
 
     [Route("api/[controller]")]

@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Syncfusion.FileManager.Base;
+using Syncfusion.EJ2.FileManager.Base;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Net.Http.Headers;
 
 
-namespace Syncfusion.FileManager.Base
+namespace Syncfusion.EJ2.FileManager.Base
 {
     public  interface PhysicalFileProviderBase : FileProviderBase
     {        

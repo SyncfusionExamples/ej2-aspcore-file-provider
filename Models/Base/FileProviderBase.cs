@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Net.Http.Headers;
 
-namespace Syncfusion.FileManager.Base
+namespace Syncfusion.EJ2.FileManager.Base
 {
     public interface FileProviderBase
     {
