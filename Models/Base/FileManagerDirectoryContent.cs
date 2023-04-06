@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 
 
-namespace Syncfusion.FileManager.Base
+namespace Syncfusion.EJ2.FileManager.Base
 {
     public class FileManagerDirectoryContent
     {
@@ -50,6 +50,8 @@ namespace Syncfusion.FileManager.Base
         public string SearchString { get; set; }
 
         public bool ShowHiddenItems { get; set; }
+
+        public bool ShowFileExtension { get; set; }
 
         public FileManagerDirectoryContent[] Data { get; set; }
 

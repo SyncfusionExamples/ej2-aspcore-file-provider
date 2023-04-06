@@ -7,7 +7,7 @@ using System.Web;
 using Microsoft.AspNetCore.Http;
 #endif
 
-namespace Syncfusion.FileManager.Base
+namespace Syncfusion.EJ2.FileManager.Base
 {
     public class FileManagerParams
     {
