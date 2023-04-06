@@ -5,7 +5,7 @@ using System.Linq;
 using System.Web;
 #endif
 
-namespace Syncfusion.EJ2.FileManager.Base
+namespace Syncfusion.FileManager.Base
 {
     public class ErrorDetails
     {

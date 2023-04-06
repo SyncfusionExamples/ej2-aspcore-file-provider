@@ -1,4 +1,4 @@
-﻿using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
+﻿using Syncfusion.FileManager.PhysicalFileProvider;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using Syncfusion.EJ2.FileManager.Base;
+using Syncfusion.FileManager.Base;
 using System.IO;
 
-namespace EJ2APIServices.Controllers
+namespace APIServices.Controllers
 {
 
     [Route("api/[controller]")]
@@ -63,7 +63,7 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive));
                 case "rename":
                     // renames a file or folder.
-                    return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName, false, args.ShowFileExtension, args.Data));
+                    return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName));
             }
             return null;
         }
