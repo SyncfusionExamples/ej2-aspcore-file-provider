@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "WJQJht7nqBf6r88Z6AB4LO+YpIJw+ghyYLBTeVoBGmZ1ZVwqtO+2Y2O5Kt1QkruojYHRMz/cq3gMP7TQ/yOs9w==",
+  "success": true,
+  "projectFilePath": "D:\\FileManager\\ej2-aspcore-file-provider\\EJ2ASPCoreFileProvider.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\MuthukrishnanKandasa\\.nuget\\packages\\newtonsoft.json\\13.0.2\\newtonsoft.json.13.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
