@@ -20,7 +20,7 @@ namespace EJ2APIServices.Controllers
         public PhysicalFileProvider operation;
         public string basePath;
         string root = "wwwroot\\FileBrowser";
-        public VirtualizationController(IHostingEnvironment hostingEnvironment)
+        public VirtualizationController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
