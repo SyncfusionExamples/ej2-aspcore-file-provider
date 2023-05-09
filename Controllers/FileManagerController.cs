@@ -24,12 +24,11 @@ namespace EJ2APIServices.Controllers
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
+            this.operation.RootFolder(this.basePath + "\\" + this.root);
         }
         [Route("FileOperations")]
         public object FileOperations([FromBody] FileManagerDirectoryContent args)
         {
-            var root = HttpContext.Request.Headers["Authorization"];
-            setRootFolder(root);
             if (args.Action == "delete" || args.Action == "rename")
             {
                 if ((args.TargetPath == null) && (args.Path == ""))
@@ -73,8 +72,6 @@ namespace EJ2APIServices.Controllers
         [Route("Upload")]
         public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
         {
-            var root = HttpContext.Request.Headers["Authorization"];
-            setRootFolder(root);
             FileManagerResponse uploadResponse;
             foreach (var file in uploadFiles)
             {
@@ -108,48 +105,16 @@ namespace EJ2APIServices.Controllers
         [Route("Download")]
         public IActionResult Download(string downloadInput)
         {
-            FileManagerDirectoryContentExtend args = JsonConvert.DeserializeObject<FileManagerDirectoryContentExtend>(downloadInput);
-            if (args.rootFolderName != null)
-            {
-                setRootFolder(args.rootFolderName);
-            }
-            else if (args.customData != null)
-            {
-                setRootFolder(args.customData["rootFolderName"].ToString());
-            }
-            else
-            {
-                this.operation.RootFolder(this.basePath + "\\" + this.root);
-            }
+            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
             return operation.Download(args.Path, args.Names, args.Data);
         }
 
         // gets the image(s) from the given path
         [Route("GetImage")]
-        public IActionResult GetImage(FileManagerDirectoryContentExtend args)
+        public IActionResult GetImage(FileManagerDirectoryContent args)
         {
-            setRootFolder(args.rootFolderName);
             return this.operation.GetImage(args.Path, args.Id,false,null, null);
-        }
-
-        public void setRootFolder(string rootFolderName)
-        {
-            if (rootFolderName == "FileBrowser")
-            {
-                this.operation.RootFolder(this.basePath + "\\wwwroot\\FileBrowser");
-            }
-            else
-            {
-                this.operation.RootFolder(this.basePath + "\\" + this.root);
-            }
-        }
-    }
-
-    public class FileManagerDirectoryContentExtend : FileManagerDirectoryContent
-    {
-        public string rootFolderName { get; set; }
-
-        public Dictionary<string, object> customData { get; set; }
+        }       
     }
 
 }
