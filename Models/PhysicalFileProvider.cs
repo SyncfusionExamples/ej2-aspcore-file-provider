@@ -33,6 +33,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string hostPath;
         protected string hostName;
         private string accessMessage = string.Empty;
+        internal HttpResponse Response;
 
         public PhysicalFileProvider()
         {
@@ -384,6 +385,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             List<FileManagerDirectoryContent> removedFiles = new List<FileManagerDirectoryContent>();
             try
             {
+                if ((Response.HttpContext.Request.Headers.Origin.ToString() == "https://ej2.syncfusion.com") || (Response.HttpContext.Request.Headers.Origin.ToString() == "https://blazor.syncfusion.com"))
+                {
+                    throw new UnauthorizedAccessException("File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo");
+                }
                 string physicalPath = GetPath(path);
                 string result = String.Empty;
                 for (int i = 0; i < names.Length; i++)
