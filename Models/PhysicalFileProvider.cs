@@ -61,6 +61,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             FileManagerResponse readResponse = new FileManagerResponse();
             try
             {
+                bool istraversed = false;
                 if (path == null)
                 {
                     path = string.Empty;
@@ -72,6 +73,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
                 string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
+                if(Path.GetFullPath(fullPath)!= GetFilePath(fullPath))
+                {
+                    // Path is invalid within the expected boundaries
+                    istraversed = true;
+                }
                 cwd.Name = string.IsNullOrEmpty(this.hostPath) ? directory.Name : new DirectoryInfo(this.hostPath + path).Name;
                 cwd.Size = 0;
                 cwd.IsFile = false;
@@ -82,11 +88,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
                 cwd.Permission = GetPathPermission(path);
                 readResponse.CWD = cwd;
-                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
+                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read) || istraversed)
                 {
                     readResponse.Files = null;
-                    accessMessage = cwd.Permission.Message;
-                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
+                    if(istraversed)
+                    {
+                        throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                    }
+                    else {
+                        accessMessage = cwd.Permission.Message;
+                        throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
+                    }
                 }
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
