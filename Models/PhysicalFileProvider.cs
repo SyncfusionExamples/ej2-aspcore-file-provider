@@ -75,7 +75,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
                 if(Path.GetFullPath(fullPath)!= GetFilePath(fullPath))
                 {
-                    // Path is invalid within the expected boundaries
                     istraversed = true;
                 }
                 cwd.Name = string.IsNullOrEmpty(this.hostPath) ? directory.Name : new DirectoryInfo(this.hostPath + path).Name;
