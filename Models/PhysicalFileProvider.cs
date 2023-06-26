@@ -61,13 +61,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             FileManagerResponse readResponse = new FileManagerResponse();
             try
             {
-                bool istraversed = false;
                 if (path == null)
                 {
                     path = string.Empty;
                 }
                 String fullPath = (contentRootPath + path);
-                fullPath = fullPath.Replace("../", "");
                 DirectoryInfo directory = new DirectoryInfo(fullPath);
                 string[] extensions = this.allowedExtension;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
@@ -75,7 +73,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
                 if(Path.GetFullPath(fullPath)!= GetFilePath(fullPath))
                 {
-                    istraversed = true;
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
                 cwd.Name = string.IsNullOrEmpty(this.hostPath) ? directory.Name : new DirectoryInfo(this.hostPath + path).Name;
                 cwd.Size = 0;
@@ -87,17 +85,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
                 cwd.Permission = GetPathPermission(path);
                 readResponse.CWD = cwd;
-                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read) || istraversed)
+                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
                 {
                     readResponse.Files = null;
-                    if(istraversed)
-                    {
-                        throw new UnauthorizedAccessException("Access denied for Directory-traversal");
-                    }
-                    else {
-                        accessMessage = cwd.Permission.Message;
-                        throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
-                    }
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
                 }
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
@@ -320,7 +312,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     else
                     {
                         fullPath = Path.Combine(contentRootPath + path, names[0]);
-                        fullPath = fullPath.Replace("../", "");
                     }
                     string physicalPath = GetPath(path);
                     DirectoryInfo directory = new DirectoryInfo(fullPath);
@@ -357,7 +348,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         else
                         {
                             fullPath = Path.Combine(contentRootPath + path, names[i]);
-                            fullPath = fullPath.Replace("../", "");
                         }
                         FileInfo info = new FileInfo(fullPath);
                         fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName = previousName + ", " + data[i].Name;
@@ -416,7 +406,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 for (int i = 0; i < names.Length; i++)
                 {
                     string fullPath = Path.Combine((contentRootPath + path), names[i]);
-                    fullPath = fullPath.Replace("../", "");
                     DirectoryInfo directory = new DirectoryInfo(fullPath);
                     if (!string.IsNullOrEmpty(names[i]))
                     {
@@ -1107,7 +1096,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (PathPermission != null && !PathPermission.Read)
                     return null;
                 String fullPath = (contentRootPath + path);
-                fullPath = fullPath.Replace("../", "");
+                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
 #if EJ2_DNX
                 if (allowCompress)
                 {
@@ -1199,6 +1191,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             FileManagerResponse uploadResponse = new FileManagerResponse();
             try
             {
+                string validatePath;
+                validatePath = Path.Combine(contentRootPath + path);
+                if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 AccessPermission PathPermission = GetPathPermission(path);
                 if (PathPermission != null && (!PathPermission.Read || !PathPermission.Upload))
                 {
@@ -1437,18 +1435,24 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             try
             {
+                string validatePath;
                 string physicalPath = GetPath(path);
                 String fullPath;
                 int count = 0;
+                validatePath = Path.Combine(contentRootPath + path);
+                if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 for (int i = 0; i < names.Length; i++)
                 {
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission FilePermission = GetPermission(physicalPath, names[i], IsFile);
                     if (FilePermission != null && (!FilePermission.Read || !FilePermission.Download))
+                    {
                         throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
-
+                    }
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
-                    fullPath = fullPath.Replace("../", "");
                     if ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory)
                     {
                         count++;
@@ -1480,7 +1484,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names == null || names.Length == 0)
                 {
                     fullPath = (contentRootPath + path);
-                    fullPath = fullPath.Replace("../", "");
                     byte[] bytes = System.IO.File.ReadAllBytes(fullPath);
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
@@ -1488,7 +1491,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 else if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    fullPath = fullPath.Replace("../", "");
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                     fileStreamResult.FileDownloadName = names[0];
@@ -1509,7 +1511,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     for (int i = 0; i < names.Count(); i++)
                     {
                         fullPath = Path.Combine((contentRootPath + path), names[i]);
-                        fullPath = fullPath.Replace("../", "");
                         if (!string.IsNullOrEmpty(fullPath))
                         {
                             try
@@ -1577,7 +1578,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names.Length == 1)
                 {
                     fullPath = Path.Combine(contentRootPath + path, names[0]);
-                    fullPath = fullPath.Replace("../", "");
                     DirectoryInfo directoryName = new DirectoryInfo(fullPath);
 
 #if SyncfusionFramework4_5
@@ -1929,7 +1929,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected virtual string GetPath(string path)
         {
             String fullPath = (this.contentRootPath + path);
-            fullPath = fullPath.Replace("../", "");
             DirectoryInfo directory = new DirectoryInfo(fullPath);
             return directory.FullName;
         }
@@ -1968,7 +1967,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected virtual bool IsDirectory(string path, string fileName)
         {
             String fullPath = Path.Combine(path, fileName);
-            fullPath = fullPath.Replace("../", "");
             return ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
         }
         protected virtual bool HasPermission(Permission rule)
