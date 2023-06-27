@@ -1312,6 +1312,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         string[] folders = name.Split('/');
                         string fileName = folders[folders.Length - 1];
                         var fullName = Path.Combine((this.contentRootPath + path), fileName);
+                        if (Path.GetFullPath(fullName) != GetFilePath(fullName) + fileName)
+                        {
+                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                        }
 #endif
                         if (action == "save")
                         {
@@ -1846,7 +1850,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     try
                     {
                         string oldPath = Path.Combine(sourceDirName, file.Name);
+                        if (Path.GetFullPath(oldPath) != GetFilePath(oldPath) + file.Name)
+                        {
+                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                        }
                         string temppath = Path.Combine(destDirName, file.Name);
+                        if (Path.GetFullPath(temppath) != GetFilePath(temppath) + file.Name)
+                        {
+                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                        }
                         File.Copy(oldPath, temppath);
                     }
                     catch (Exception e)
@@ -1864,7 +1876,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 foreach (DirectoryInfo direc in dirs)
                 {
                     string oldPath = Path.Combine(sourceDirName, direc.Name);
+                    if (Path.GetFullPath(oldPath) != GetFilePath(oldPath) + direc.Name)
+                    {
+                        throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                    }
                     string temppath = Path.Combine(destDirName, direc.Name);
+                    if (Path.GetFullPath(temppath) != GetFilePath(temppath) + direc.Name)
+                    {
+                        throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                    }
                     result = DirectoryCopy(oldPath, temppath);
                     if (result != String.Empty)
                     {
