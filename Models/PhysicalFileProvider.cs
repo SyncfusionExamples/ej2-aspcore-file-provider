@@ -532,7 +532,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 
                 string tempPath = (contentRootPath + path);
                 string oldPath = Path.Combine(tempPath, name);
+                if (Path.GetFullPath(oldPath) != GetFilePath(oldPath) + name)
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 string newPath = Path.Combine(tempPath, newName);
+                if (Path.GetFullPath(newPath) != GetFilePath(newPath) + newName)
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 FileAttributes attr = File.GetAttributes(oldPath);
 
                 FileInfo info = new FileInfo(oldPath);
@@ -1050,6 +1058,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (path == null) { path = string.Empty; };
                 string searchWord = searchString;
                 string searchPath = (this.contentRootPath + path);
+                if (Path.GetFullPath(searchPath) != GetFilePath(searchPath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 DirectoryInfo directory = new DirectoryInfo(this.contentRootPath + path);
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 cwd.Name = directory.Name;
@@ -1175,7 +1187,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (PathPermission != null && !PathPermission.Read)
                     return null;
                 String fullPath = (contentRootPath + path);
-                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath))
+                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath) + this.getFileNameFromPath(fullPath))
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
