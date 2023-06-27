@@ -33,7 +33,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string hostPath;
         protected string hostName;
         private string accessMessage = string.Empty;
-        internal HttpResponse Response;
 
         public PhysicalFileProvider()
         {
