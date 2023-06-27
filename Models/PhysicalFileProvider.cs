@@ -84,17 +84,11 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
                 cwd.Permission = GetPathPermission(path);
                 readResponse.CWD = cwd;
-                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read) || istraversed)
+                if (!hasAccess(directory.FullName) || (cwd.Permission != null && !cwd.Permission.Read))
                 {
                     readResponse.Files = null;
-                    if(istraversed)
-                    {
-                        throw new UnauthorizedAccessException("Access Denied");
-                    }
-                    else {
-                        accessMessage = cwd.Permission.Message;
-                        throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
-                    }
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
                 }
                 readResponse.Files = ReadDirectories(directory, extensions, showHiddenItems, data);
                 readResponse.Files = readResponse.Files.Concat(ReadFiles(directory, extensions, showHiddenItems, data));
