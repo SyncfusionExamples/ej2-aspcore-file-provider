@@ -20,7 +20,7 @@ namespace EJ2APIServices.Controllers
         public PhysicalFileProvider operation;
         public string basePath;
         string root = "wwwroot\\Files";
-        public FileManagerController(IHostingEnvironment hostingEnvironment)
+        public FileManagerController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
@@ -45,6 +45,7 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, args.ShowHiddenItems));
                 case "delete":
                     // deletes the selected file(s) or folder(s) from the given path.
+                    this.operation.Response = Response;
                     return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names));
                 case "copy":
                     // copies the selected file(s) or folder(s) from a path and then pastes them into a given target path.
@@ -90,14 +91,14 @@ namespace EJ2APIServices.Controllers
                     }
                 }
             }
-            uploadResponse = operation.Upload(path, uploadFiles, action, null);
-            if (uploadResponse.Error != null)
-            {
+            //uploadResponse = operation.Upload(path, uploadFiles, action, null);
+            //if (uploadResponse.Error != null)
+            //{
                Response.Clear();
                Response.ContentType = "application/json; charset=utf-8";
-               Response.StatusCode = Convert.ToInt32(uploadResponse.Error.Code);
-               Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = uploadResponse.Error.Message;
-            }
+               Response.StatusCode = Convert.ToInt32("403");
+               Response.HttpContext.Features.Get<IHttpResponseFeature>().ReasonPhrase = "File Manager's upload functionality is restricted in online demos. Please run the service provider in local machine to test the upload functionality";
+            //}
             return Content("");
         }
 

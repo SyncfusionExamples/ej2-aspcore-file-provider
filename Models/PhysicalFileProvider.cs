@@ -33,6 +33,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string hostPath;
         protected string hostName;
         private string accessMessage = string.Empty;
+        internal HttpResponse Response;
 
         public PhysicalFileProvider()
         {
@@ -405,13 +406,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
             List<FileManagerDirectoryContent> removedFiles = new List<FileManagerDirectoryContent>();
+            string validatePath;
+            validatePath = Path.Combine(contentRootPath + path);
+            if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
+            {
+                throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+            }
             try
             {
-                string validatePath;
-                validatePath = Path.Combine(contentRootPath + path);
-                if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
+                if ((Response.HttpContext.Request.Headers.Origin.ToString() == "https://ej2.syncfusion.com") || (Response.HttpContext.Request.Headers.Origin.ToString() == "https://blazor.syncfusion.com"))
                 {
-                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                    throw new UnauthorizedAccessException("File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo");
                 }
                 string physicalPath = GetPath(path);
                 string result = String.Empty;
@@ -1302,15 +1307,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 #if EJ2_DNX
                         var name = System.IO.Path.GetFileName(file.FileName);
                         var fullName = Path.Combine((this.contentRootPath + path), name);
-                        if (Path.GetFullPath(fullName) != GetFilePath(fullName) + fileName)
-                        {
-                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
-                        }
 #else
                         var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim().ToString();
                         string[] folders = name.Split('/');
                         string fileName = folders[folders.Length - 1];
                         var fullName = Path.Combine((this.contentRootPath + path), fileName);
+                        if (Path.GetFullPath(fullName) != GetFilePath(fullName) + fileName)
+                        {
+                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                        }
 #endif
                         if (action == "save")
                         {
@@ -1550,8 +1555,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     bool IsFile = !IsDirectory(physicalPath, names[i]);
                     AccessPermission FilePermission = GetPermission(physicalPath, names[i], IsFile);
                     if (FilePermission != null && (!FilePermission.Read || !FilePermission.Download))
+                    {
                         throw new UnauthorizedAccessException("'" + this.rootName + path + names[i] + "' is not accessible. Access is denied.");
-
+                    }
                     fullPath = Path.Combine(contentRootPath + path, names[i]);
                     if (Path.GetFullPath(fullPath) != GetFilePath(fullPath) + names[i])
                     {

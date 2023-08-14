@@ -1,4 +1,4 @@
-using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
+﻿using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -20,7 +20,7 @@ namespace EJ2APIServices.Controllers
         public PhysicalFileProvider operation;
         public string basePath;
         string root = "wwwroot\\Files";
-        public FileManagerAccessController(IHostingEnvironment hostingEnvironment)
+        public FileManagerAccessController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
