@@ -2,6 +2,8 @@
 
 This repository contains the ASP.NET Core file system providers for the Essential JS 2 File Manager component.
 
+To know more about file system provider for File Manager, please refer our documentation [here](https://ej2.syncfusion.com/aspnetcore/documentation/file-manager/file-system-provider).
+
 ## Key Features
 
 A file system provider is an API for access to the physical file system in the FileManager control. It also provides the methods for performing various file actions like creating a new folder, renaming files and deleting files.
