@@ -17,7 +17,7 @@ The following actions can be performed with ASP.NET Core file system Provider.
 | Read      | Read the files from the local file storage. |
 | Details   | Gets a file's metadata which consists of Type, Size, Location and Modified date. |
 | Download  | Download the selected file or folder. |
-| Upload    | Upload's the file. t accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*`</li></ul> |
+| Upload    | Upload's the file. Accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*`</li></ul> |
 | Create    | Create a new folder. |
 | Delete    | Delete a folder or file. |
 | Copy      | Copies the contents of the file from the target location . |
@@ -105,4 +105,4 @@ Check the license detail [here](https://github.com/syncfusion/ej2-javascript-ui-
 
 Check the changelog [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/controls/filemanager/CHANGELOG.md)
 
-© Copyright 2022 Syncfusion, Inc. All Rights Reserved. The Syncfusion Essential Studio license and copyright applies to this distribution.
+© Copyright 2023 Syncfusion, Inc. All Rights Reserved. The Syncfusion Essential Studio license and copyright applies to this distribution.
