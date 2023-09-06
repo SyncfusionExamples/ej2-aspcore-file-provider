@@ -14,8 +14,8 @@ namespace EJ2APIServices.Controllers
 {
     public class FileDownloadInfo
     {
-        public string FileName { get; set; }
-        public string base64 { get;set; }
+        public string fileName { get; set; }
+        public string base64Data { get;set; }
     }
 
     [Route("api/[controller]")]
@@ -111,10 +111,8 @@ namespace EJ2APIServices.Controllers
         [Route("Download")]
         public object Download([FromBody] FileManagerDirectoryContent args)
         {
-			var root = HttpContext.Request.Headers["Authorization"];
 			FileStreamResult fileStreamResult = this.operation.Download(args.Path, args.Names, args.Data); // Replace with your method to generate FileStreamResult
 			FileDownloadInfo downloadInfo = new FileDownloadInfo();
-			//downloadInfo.FileStream = (System.IO.FileStream)fileStreamResult.FileStream;
 			using (MemoryStream memoryStream = new MemoryStream())
 			{
 				// Copy the data from the FileStream to the MemoryStream
@@ -126,9 +124,9 @@ namespace EJ2APIServices.Controllers
 				// Convert the byte array to a base64 string
 				string base64String = Convert.ToBase64String(byteArray);
 
-				downloadInfo.base64 = base64String;
+				downloadInfo.base64Data = base64String;
 			}
-			downloadInfo.FileName = fileStreamResult.FileDownloadName;
+			downloadInfo.fileName = fileStreamResult.FileDownloadName;
 			string serializedResult = JsonConvert.SerializeObject(downloadInfo);
 			return Content(serializedResult, "application/json");
 		}
