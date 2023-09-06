@@ -15,7 +15,7 @@ namespace EJ2APIServices.Controllers
     public class FileDownloadInfo
     {
         public string fileName { get; set; }
-        public string base64Data { get;set; }
+        public string base64String { get;set; }
     }
 
     [Route("api/[controller]")]
@@ -123,7 +123,7 @@ namespace EJ2APIServices.Controllers
 				// Convert the byte array to a base64 string
 				string base64String = Convert.ToBase64String(byteArray);
 
-				downloadInfo.base64Data = base64String;
+				downloadInfo.base64String = base64String;
 			}
 			downloadInfo.fileName = fileStreamResult.FileDownloadName;
 			string serializedResult = JsonConvert.SerializeObject(downloadInfo);
