@@ -12,11 +12,6 @@ using System.IO;
 
 namespace EJ2APIServices.Controllers
 {
-    public class FileDownloadInfo
-    {
-        public string fileName { get; set; }
-        public string base64String { get;set; }
-    }
 
     [Route("api/[controller]")]
     [EnableCors("AllowAllOrigins")]
@@ -109,27 +104,11 @@ namespace EJ2APIServices.Controllers
 
         // downloads the selected file(s) and folder(s)
         [Route("Download")]
-        public object Download([FromBody] FileManagerDirectoryContent args)
+        public IActionResult Download(string downloadInput)
         {
-			FileStreamResult fileStreamResult = this.operation.Download(args.Path, args.Names, args.Data); // Replace with your method to generate FileStreamResult
-			FileDownloadInfo downloadInfo = new FileDownloadInfo();
-			using (MemoryStream memoryStream = new MemoryStream())
-			{
-				// Copy the data from the FileStream to the MemoryStream
-				fileStreamResult.FileStream.CopyTo(memoryStream);
-
-				// Convert the MemoryStream data to a byte array
-				byte[] byteArray = memoryStream.ToArray();
-
-				// Convert the byte array to a base64 string
-				string base64String = Convert.ToBase64String(byteArray);
-
-				downloadInfo.base64String = base64String;
-			}
-			downloadInfo.fileName = fileStreamResult.FileDownloadName;
-			string serializedResult = JsonConvert.SerializeObject(downloadInfo);
-			return Content(serializedResult, "application/json");
-		}
+            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
+            return operation.Download(args.Path, args.Names, args.Data);
+        }
 
         // gets the image(s) from the given path
         [Route("GetImage")]
