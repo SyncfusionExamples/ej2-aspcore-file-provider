@@ -84,7 +84,7 @@ namespace EJ2APIServices.Controllers
                         for (var i = 0; i < folders.Length - 1; i++)
                         {
                             string newDirectoryPath = Path.Combine(this.basePath + path, folders[i]);
-                            if (Path.GetFullPath(newDirectoryPath) != (Path.GetDirectoryName(newDirectoryPath) + Path.DirectorySeparatorChar))
+                            if (Path.GetFullPath(newDirectoryPath) != (Path.GetDirectoryName(newDirectoryPath) + Path.DirectorySeparatorChar + folders[i]))
                             {
                                 throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                             }
