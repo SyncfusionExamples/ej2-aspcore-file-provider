@@ -1594,6 +1594,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if (names == null || names.Length == 0)
                 {
                     fullPath = (contentRootPath + path);
+                    if (Path.GetFullPath(fullPath) != GetFilePath(fullPath) + names[0])
+                    {
+                        throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                    }
                     byte[] bytes = System.IO.File.ReadAllBytes(fullPath);
                     FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                     fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
@@ -2105,8 +2109,21 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         }
         protected virtual bool IsDirectory(string path, string fileName)
         {
-            String fullPath = Path.Combine(path, fileName);
-            return ((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
+            try
+            {
+                string fullPath = Path.Combine(path, fileName);
+                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
+                FileAttributes attributes = File.GetAttributes(fullPath);
+
+                return ((attributes & FileAttributes.Directory) != FileAttributes.Directory) ? false : true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
         }
         protected virtual bool HasPermission(Permission rule)
         {
