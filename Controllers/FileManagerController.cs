@@ -126,7 +126,6 @@ namespace EJ2APIServices.Controllers
         public IActionResult Download([FromBody] FileManagerDirectoryContent args)
         {
             FileStreamResult fileStreamResult = this.operation.Download(args.Path, args.Names, args.Data);
-            Response.Headers.Add("Custom-File-Name", fileStreamResult.FileDownloadName);
             return fileStreamResult;
         }
 

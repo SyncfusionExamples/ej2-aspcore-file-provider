@@ -36,7 +36,7 @@ namespace EJ2FileManagerService
                     builder.AllowAnyOrigin()
                     .AllowAnyMethod()
                     .AllowAnyHeader()
-                    .WithExposedHeaders("Custom-File-Name");
+                    .WithExposedHeaders("Content-Disposition");
                 });
             });
         }
