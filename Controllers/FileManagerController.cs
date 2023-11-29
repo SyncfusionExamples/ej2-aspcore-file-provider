@@ -125,8 +125,7 @@ namespace EJ2APIServices.Controllers
         [Route("Download")]
         public IActionResult Download([FromBody] FileManagerDirectoryContent args)
         {
-            FileStreamResult fileStreamResult = this.operation.Download(args.Path, args.Names, args.Data);
-            return fileStreamResult;
+            return this.operation.Download(args.Path, args.Names, args.Data);
         }
 
         // gets the image(s) from the given path
