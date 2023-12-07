@@ -2304,8 +2304,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         }
         private string getFileNameFromPath(string path)
         {
-            int index = path.LastIndexOf("/");
-            return path.Substring(index + 1);
+            string[] segments = path.TrimEnd('/').Split('/');
+            return segments.LastOrDefault();
         }
 
     }
