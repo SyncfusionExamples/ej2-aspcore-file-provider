@@ -35,8 +35,7 @@ namespace EJ2FileManagerService
                 {
                     builder.AllowAnyOrigin()
                     .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .WithExposedHeaders("Content-Disposition");
+                    .AllowAnyHeader();
                 });
             });
         }

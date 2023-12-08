@@ -123,9 +123,10 @@ namespace EJ2APIServices.Controllers
 
         // downloads the selected file(s) and folder(s)
         [Route("Download")]
-        public IActionResult Download([FromBody] FileManagerDirectoryContent args)
+        public IActionResult Download(string downloadInput)
         {
-            return this.operation.Download(args.Path, args.Names, args.Data);
+            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
+            return operation.Download(args.Path, args.Names, args.Data);
         }
 
         // gets the image(s) from the given path
