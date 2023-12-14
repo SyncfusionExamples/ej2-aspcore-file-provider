@@ -19,12 +19,12 @@ namespace EJ2APIServices.Controllers
     {
         public PhysicalFileProvider operation;
         public string basePath;
-        string root = "wwwroot\\Files";
+        string root = $"wwwroot{Path.DirectorySeparatorChar}Files";
         public FileManagerController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.operation = new PhysicalFileProvider();
-            this.operation.RootFolder(this.basePath + "\\" + this.root);
+            this.operation.RootFolder($"{this.basePath}{Path.DirectorySeparatorChar}{this.root}");
         }
         [Route("FileOperations")]
         public object FileOperations([FromBody] FileManagerDirectoryContent args)
