@@ -374,15 +374,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         FileInfo info = new FileInfo(fullPath);
                         fileDetails.Name = previousName == "" ? previousName = data[i].Name : previousName = previousName + ", " + data[i].Name;
                         fileDetails.Size = (long.Parse(fileDetails.Size) + (((File.GetAttributes(fullPath) & FileAttributes.Directory) != FileAttributes.Directory) ? info.Length : GetDirectorySize(new DirectoryInfo(fullPath), 0))).ToString();
-                        relativePath = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName);
-                        previousPath = previousPath == "" ? relativePath : previousPath;
-                        if (previousPath == relativePath && !isVariousFolders)
+                        previousPath = previousPath == "" ? GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) : previousPath;
+                        if (previousPath == GetRelativePath(baseDirectoryParentPath, info.Directory.FullName) && !isVariousFolders)
                         {
-                            previousPath = relativePath;
+                            previousPath = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName);
+                            fileDetails.Location = GetRelativePath(baseDirectoryParentPath, info.Directory.FullName).Substring(1);
                         }
                         else
                         {
                             isVariousFolders = true;
+                            fileDetails.Location = "Various Folders";
                         }
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
