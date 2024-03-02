@@ -203,7 +203,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             .Select(subDirectory => new FileManagerDirectoryContent
                             {
                                 Name = subDirectory.Name,
-                                Size = 0,
+                                Size = subDirectory.EnumerateFiles().Sum(file => file.Length),
                                 IsFile = false,
                                 DateModified = subDirectory.LastWriteTime,
                                 DateCreated = subDirectory.CreationTime,
@@ -219,7 +219,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     IEnumerable<FileManagerDirectoryContent> directories = directory.GetDirectories().Select(subDirectory => new FileManagerDirectoryContent
                     {
                         Name = subDirectory.Name,
-                        Size = 0,
+                        Size = subDirectory.EnumerateFiles().Sum(file => file.Length),
                         IsFile = false,
                         DateModified = subDirectory.LastWriteTime,
                         DateCreated = subDirectory.CreationTime,
