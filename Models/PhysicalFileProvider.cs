@@ -2112,7 +2112,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             try
             {
                 string fullPath = Path.Combine(path, fileName);
-                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath))
+                if (Path.GetFullPath(fullPath) != GetFilePath(fullPath) + Path.GetFileName(fileName))
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
