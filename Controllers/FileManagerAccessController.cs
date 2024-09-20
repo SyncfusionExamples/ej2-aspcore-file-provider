@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Syncfusion.EJ2.FileManager.Base;
 using System.IO;
+using System.Text.Json;
 
 namespace EJ2APIServices.Controllers
 {
@@ -126,7 +126,11 @@ namespace EJ2APIServices.Controllers
         [Route("Download")]
         public IActionResult Download(string downloadInput)
         {
-            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            };
+            FileManagerDirectoryContent args = JsonSerializer.Deserialize<FileManagerDirectoryContent>(downloadInput, options);
             return operation.Download(args.Path, args.Names, args.Data);
         }
 
