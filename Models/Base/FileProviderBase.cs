@@ -32,7 +32,7 @@ namespace Syncfusion.EJ2.FileManager.Base
 #if EJ2_DNX
             FileManagerResponse Upload(string path, IList<System.Web.HttpPostedFileBase> uploadFiles, string action, params FileManagerDirectoryContent[] data);
 #else
-        FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data);
+        FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, long size, params FileManagerDirectoryContent[] data);
 #endif
 
         FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data);

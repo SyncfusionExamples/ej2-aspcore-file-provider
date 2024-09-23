@@ -72,7 +72,7 @@ namespace EJ2APIServices.Controllers
 
         // uploads the file(s) into a specified path
         [Route("Upload")]
-        public IActionResult Upload(string path, IList<IFormFile> uploadFiles, string action)
+        public IActionResult Upload(string path, long size, IList<IFormFile> uploadFiles, string action)
         {
             try
             {
@@ -98,7 +98,7 @@ namespace EJ2APIServices.Controllers
                         }
                     }
                 }
-                uploadResponse = operation.Upload(path, uploadFiles, action, null);
+                uploadResponse = operation.Upload(path, uploadFiles, action, size, null);
                 if (uploadResponse.Error != null)
                 {
                     Response.Clear();
