@@ -1324,21 +1324,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             if (!System.IO.File.Exists(fullName) || isValidChunkUpload)
                             {
 #if !EJ2_DNX
-                                if (file.ContentType == "application/octet-stream") //Handle chunk upload
-                                {
-                                    using (var fileStream = new FileStream(fullName, FileMode.Append))
-                                    {
-                                        file.CopyTo(fileStream);
-                                    }
-                                }
-                                else //Handle normal upload
-                                {
-                                    using (FileStream fs = System.IO.File.Create(fullName))
-                                    {
-                                        file.CopyTo(fs);
-                                        fs.Flush();
-                                    }
-                                }
+                                PerformUpload(file, fileLength, size, fullName);
 #else
                                 file.SaveAs(fullName);
 #endif
@@ -1368,23 +1354,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             {
                                 System.IO.File.Delete(fullName);
                             }
-                            bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
 #if !EJ2_DNX
-                            if (file.ContentType == "application/octet-stream") //Handle chunk upload
-                            {
-                                using (var fileStream = new FileStream(fullName, FileMode.Append))
-                                {
-                                    file.CopyTo(fileStream);
-                                }
-                            }
-                            else //Handle normal upload
-                            {
-                                using (FileStream fs = System.IO.File.Create(fullName))
-                                {
-                                    file.CopyTo(fs);
-                                    fs.Flush();
-                                }
-                            }
+                            PerformUpload(file, fileLength, size, fullName);
 #else
                             file.SaveAs(fullName);
 #endif
@@ -1403,23 +1374,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
 #if !EJ2_DNX
                             long newFileLength = File.Exists(newName) ? new FileInfo(newName).Length : default;
-                            bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (newFileLength != size);
-
-                            if (file.ContentType == "application/octet-stream") //Handle chunk upload
-                            {
-                                using (var fileStream = new FileStream(fullName, FileMode.Append))
-                                {
-                                    file.CopyTo(fileStream);
-                                }
-                            }
-                            else //Handle normal upload
-                            {
-                                using (FileStream fs = System.IO.File.Create(newName))
-                                {
-                                    file.CopyTo(fs);
-                                    fs.Flush();
-                                }
-                            }
+                            PerformUpload(file, newFileLength, size, newName);
 #else
                             file.SaveAs(newName);
 #endif
@@ -1445,6 +1400,27 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
+            }
+        }
+
+        private void PerformUpload(IFormFile file, long fileLength, long size, string name)
+        {
+            bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
+
+            if (file.ContentType == "application/octet-stream")
+            {
+                using (var fileStream = new FileStream(name, FileMode.Append))
+                {
+                    file.CopyTo(fileStream);
+                }
+            }
+            else
+            {
+                using (FileStream fs = System.IO.File.Create(name))
+                {
+                    file.CopyTo(fs);
+                    fs.Flush();
+                }
             }
         }
 #if SyncfusionFramework4_0
