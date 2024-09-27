@@ -1276,7 +1276,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 #if EJ2_DNX
         public virtual FileManagerResponse Upload(string path, IList<System.Web.HttpPostedFileBase> uploadFiles, string action, params FileManagerDirectoryContent[] data)
 #else
-        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, long size, params FileManagerDirectoryContent[] data)
 #endif
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
@@ -1317,16 +1317,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                         }
 #endif
+                        long fileLength = File.Exists(fullName) ? new FileInfo(fullName).Length : default;
                         if (action == "save")
                         {
-                            if (!System.IO.File.Exists(fullName))
+                            bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
+                            if (!System.IO.File.Exists(fullName) || isValidChunkUpload)
                             {
 #if !EJ2_DNX
-                                using (FileStream fs = System.IO.File.Create(fullName))
-                                {
-                                    file.CopyTo(fs);
-                                    fs.Flush();
-                                }
+                                PerformUpload(file, fileLength, size, fullName);
 #else
                                 file.SaveAs(fullName);
 #endif
@@ -1357,11 +1355,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 System.IO.File.Delete(fullName);
                             }
 #if !EJ2_DNX
-                            using (FileStream fs = System.IO.File.Create(fullName))
-                            {
-                                file.CopyTo(fs);
-                                fs.Flush();
-                            }
+                            PerformUpload(file, fileLength, size, fullName);
 #else
                             file.SaveAs(fullName);
 #endif
@@ -1379,11 +1373,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
 #if !EJ2_DNX
-                            using (FileStream fs = System.IO.File.Create(newName))
-                            {
-                                file.CopyTo(fs);
-                                fs.Flush();
-                            }
+                            long newFileLength = File.Exists(newName) ? new FileInfo(newName).Length : default;
+                            PerformUpload(file, newFileLength, size, newName);
 #else
                             file.SaveAs(newName);
 #endif
@@ -1409,6 +1400,27 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
+            }
+        }
+
+        private void PerformUpload(IFormFile file, long fileLength, long size, string name)
+        {
+            bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
+
+            if (file.ContentType == "application/octet-stream")
+            {
+                using (var fileStream = new FileStream(name, FileMode.Append))
+                {
+                    file.CopyTo(fileStream);
+                }
+            }
+            else
+            {
+                using (FileStream fs = System.IO.File.Create(name))
+                {
+                    file.CopyTo(fs);
+                    fs.Flush();
+                }
             }
         }
 #if SyncfusionFramework4_0
