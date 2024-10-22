@@ -406,14 +406,14 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         {
             FileManagerResponse DeleteResponse = new FileManagerResponse();
             List<FileManagerDirectoryContent> removedFiles = new List<FileManagerDirectoryContent>();
-            string validatePath;
-            validatePath = Path.Combine(contentRootPath + path);
-            if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
-            {
-                throw new UnauthorizedAccessException("Access denied for Directory-traversal");
-            }
             try
             {
+                string validatePath;
+                validatePath = Path.Combine(contentRootPath + path);
+                if (Path.GetFullPath(validatePath) != GetFilePath(validatePath))
+                {
+                    throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                }
                 if ((Response.HttpContext.Request.Headers.Origin.ToString() == "https://ej2.syncfusion.com") || (Response.HttpContext.Request.Headers.Origin.ToString() == "https://blazor.syncfusion.com"))
                 {
                     throw new UnauthorizedAccessException("File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo");
@@ -591,7 +591,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             catch (Exception e)
             {
                 ErrorDetails er = new ErrorDetails();
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(this.rootName + path + name) + "' is not accessible. You need permission to perform the write action." : e.Message.ToString();
+                er.Message = e.Message.ToString();
                 er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
                 if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 renameResponse.Error = er;
@@ -1395,7 +1395,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             {
                 ErrorDetails er = new ErrorDetails();
 
-                er.Message = (e.GetType().Name == "UnauthorizedAccessException") ? "'" + this.getFileNameFromPath(path) + "' is not accessible. You need permission to perform the upload action." : e.Message.ToString();
+                er.Message = e.Message.ToString();
                 er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
                 if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
