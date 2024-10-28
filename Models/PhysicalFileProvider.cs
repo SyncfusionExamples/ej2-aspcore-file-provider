@@ -1350,7 +1350,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         }
                         else if (action == "replace")
                         {
-                            if (System.IO.File.Exists(fullName))
+                            long duplicateFileSize = new FileInfo(fullName).Length;
+                            if (System.IO.File.Exists(fullName) && duplicateFileSize == size)
                             {
                                 System.IO.File.Delete(fullName);
                             }
@@ -1369,7 +1370,15 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             int fileCount = 0;
                             while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
                             {
-                                fileCount++;
+                                long duplicateSize = new FileInfo(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))).Length;
+                                if (duplicateSize== size)
+                                {
+                                    fileCount++;
+                                }
+                                else
+                                {
+                                    break;
+                                }
                             }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
 #if !EJ2_DNX
