@@ -379,10 +379,12 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         if (previousPath == relativePath && !isVariousFolders)
                         {
                             previousPath = relativePath;
+                            fileDetails.Location = previousPath.Substring(1);
                         }
                         else
                         {
                             isVariousFolders = true;
+                            fileDetails.Location = "Various Folders";
                         }
                     }
                     fileDetails.Size = byteConversion(long.Parse(fileDetails.Size)).ToString();
