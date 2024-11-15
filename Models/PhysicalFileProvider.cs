@@ -24,7 +24,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 {
-    public class PhysicalFileProvider : PhysicalFileProviderBase
+    public class PhysicalFileProvider
     {
         protected string contentRootPath;
         protected string[] allowedExtension = new string[] { "*" };
@@ -1278,7 +1278,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 #if EJ2_DNX
         public virtual FileManagerResponse Upload(string path, IList<System.Web.HttpPostedFileBase> uploadFiles, string action, params FileManagerDirectoryContent[] data)
 #else
-        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, long size, params FileManagerDirectoryContent[] data)
+        public virtual FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, long size = 0, params FileManagerDirectoryContent[] data)
 #endif
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
@@ -1309,6 +1309,10 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 #if EJ2_DNX
                         var name = System.IO.Path.GetFileName(file.FileName);
                         var fullName = Path.Combine((this.contentRootPath + path), name);
+                        if (Path.GetFullPath(fullName) != GetFilePath(fullName) + Path.GetFileName(fullName))
+                        {
+                            throw new UnauthorizedAccessException("Access denied for Directory-traversal");
+                        }
 #else
                         var name = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim().ToString();
                         string[] folders = name.Split('/');
@@ -1318,16 +1322,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         {
                             throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                         }
+                        long fileLength = File.Exists(fullName) ? new FileInfo(fullName).Length : 0;
 #endif
-                        long fileLength = File.Exists(fullName) ? new FileInfo(fullName).Length : default;
                         if (action == "save")
                         {
+#if !EJ2_DNX
                             bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
                             if (!System.IO.File.Exists(fullName) || isValidChunkUpload)
                             {
-#if !EJ2_DNX
                                 PerformUpload(file, fileLength, size, fullName);
 #else
+                            if (!System.IO.File.Exists(fullName))
+                            {
                                 file.SaveAs(fullName);
 #endif
                             }
@@ -1352,14 +1358,18 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                         }
                         else if (action == "replace")
                         {
+#if !EJ2_DNX
                             long duplicateFileSize = new FileInfo(fullName).Length;
-                            if (System.IO.File.Exists(fullName) && duplicateFileSize == size)
+                            if (System.IO.File.Exists(fullName) && (duplicateFileSize == size || file.ContentType != "application/octet-stream"))
                             {
                                 System.IO.File.Delete(fullName);
                             }
-#if !EJ2_DNX
                             PerformUpload(file, fileLength, size, fullName);
 #else
+                            if (System.IO.File.Exists(fullName))
+                            {
+                                System.IO.File.Delete(fullName);
+                            }
                             file.SaveAs(fullName);
 #endif
                         }
@@ -1372,8 +1382,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             int fileCount = 0;
                             while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
                             {
+#if !EJ2_DNX
                                 long duplicateSize = new FileInfo(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))).Length;
-                                if (duplicateSize== size)
+                                if (duplicateSize == size || file.ContentType != "application/octet-stream")
                                 {
                                     fileCount++;
                                 }
@@ -1381,6 +1392,9 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                                 {
                                     break;
                                 }
+#else
+                                fileCount++;
+#endif
                             }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
 #if !EJ2_DNX
@@ -1414,6 +1428,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
         }
 
+#if !EJ2_DNX
         private void PerformUpload(IFormFile file, long fileLength, long size, string name)
         {
             bool isValidChunkUpload = file.ContentType == "application/octet-stream" && (fileLength != size);
@@ -1434,6 +1449,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 }
             }
         }
+#endif
+
 #if SyncfusionFramework4_0
         public virtual void Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
@@ -2202,11 +2219,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             };
 
             return JsonSerializer.Serialize(userData, options);
-        }
-
-        FileStreamResult FileProviderBase.Download(string path, string[] names, params FileManagerDirectoryContent[] data)
-        {
-            throw new NotImplementedException();
         }
 
         private bool CheckChild(string path)
