@@ -1398,7 +1398,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             }
                             newName = newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
 #if !EJ2_DNX
-                            long newFileLength = File.Exists(newName) ? new FileInfo(newName).Length : default;
+                            long newFileLength = File.Exists(newName) ? new FileInfo(newName).Length : 0;
                             PerformUpload(file, newFileLength, size, newName);
 #else
                             file.SaveAs(newName);
