@@ -1181,7 +1181,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                        + "$";
         }
 
-        public virtual FileStreamResult GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
+        public virtual FileStream GetImage(string path, string id, bool allowCompress, ImageSize size, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -1200,10 +1200,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     CompressImage(fullPath, size);
                 }
 #endif
-
-                FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
-                FileStreamResult fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                return fileStreamResult;
+                return new FileStream(fullPath, FileMode.Open, FileAccess.Read);
             }
             catch (Exception)
             {
@@ -1577,7 +1574,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 
 #else
 
-        public virtual FileStreamResult Download(string path, string[] names, params FileManagerDirectoryContent[] data)
+        public virtual FileStream Download(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
             try
             {
@@ -1623,8 +1620,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
         }
 
-        private FileStreamResult fileStreamResult;
-        protected virtual FileStreamResult DownloadFile(string path, string[] names = null)
+        protected virtual FileStream DownloadFile(string path, string[] names = null)
         {
             try
             {
@@ -1638,9 +1634,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     {
                         throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                     }
-                    byte[] bytes = System.IO.File.ReadAllBytes(fullPath);
-                    FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
-                    fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
+                    return new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                 }
                 else if (names.Length == 1)
                 {
@@ -1649,9 +1643,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     {
                         throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                     }
-                    FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
-                    fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName = names[0];
+                    return new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                 }
                 else if (names.Length > 1)
                 {
@@ -1703,27 +1695,21 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     }
                     try
                     {
-                        FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
-                        fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                        fileStreamResult.FileDownloadName = "files.zip";
+                        return new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete); ;
                     }
                     catch (Exception)
                     {
                         throw;
                     }
                 }
-                if (File.Exists(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
-                return fileStreamResult;
+                return null;
             }
             catch (Exception)
             {
                 throw;
             }
         }
-        protected FileStreamResult DownloadFolder(string path, string[] names, int count)
+        protected FileStream DownloadFolder(string path, string[] names, int count)
         {
             try
             {
@@ -1731,7 +1717,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     path = Path.GetDirectoryName(path);
                 }
-                FileStreamResult fileStreamResult;
                 // create a temp.Zip file intially 
                 string tempPath = Path.Combine(Path.GetTempPath(), "temp.zip");
                 String fullPath;
@@ -1753,9 +1738,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
 #else
                     ZipFile.CreateFromDirectory(fullPath, tempPath, CompressionLevel.Fastest, true);
 #endif
-                    FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
-                    fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName = directoryName.Name + ".zip";
+                    return new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                 }
                 else
                 {
@@ -1813,15 +1796,8 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                             }
                         }
                     }
-                    FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
-                    fileStreamResult = new FileStreamResult(fileStreamInput, "application/force-download");
-                    fileStreamResult.FileDownloadName = "folders.zip";
+                    return new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
                 }
-                if (File.Exists(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
-                return fileStreamResult;
             }
             catch (Exception)
             {
