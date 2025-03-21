@@ -71,7 +71,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
                 string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
-                if (Path.GetFullPath(safePath) != GetFilePath(safePath))
+                if(Path.GetFullPath(safePath) != GetFilePath(safePath))
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
