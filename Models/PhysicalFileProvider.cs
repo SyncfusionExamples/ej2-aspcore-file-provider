@@ -1195,6 +1195,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     CompressImage(fullPath, size);
                 }
 #endif
+
                 FileStream fileStreamInput = new FileStream(fullPath, FileMode.Open, FileAccess.Read);
                 FileStreamResult fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
                 return fileStreamResult;
