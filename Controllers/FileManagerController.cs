@@ -124,7 +124,7 @@ namespace EJ2APIServices.Controllers
 
         // downloads the selected file(s) and folder(s)
         [Route("Download")]
-        public object Download(string downloadInput)
+        public IActionResult Download(string downloadInput)
         {
             var options = new JsonSerializerOptions
             {
@@ -136,7 +136,7 @@ namespace EJ2APIServices.Controllers
 
         // gets the image(s) from the given path
         [Route("GetImage")]
-        public object GetImage(FileManagerDirectoryContent args)
+        public IActionResult GetImage(FileManagerDirectoryContent args)
         {
             return this.operation.GetImage(args.Path, args.Id,false,null, null);
         }       
