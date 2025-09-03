@@ -516,7 +516,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
                 string physicalPath = GetPath(path);
-                if (!showFileExtension)
+                if (!showFileExtension && data[0].IsFile)
                 {
                     name = name + data[0].Type;
                     newName = newName + data[0].Type;
