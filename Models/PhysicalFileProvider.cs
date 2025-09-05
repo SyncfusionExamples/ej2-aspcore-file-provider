@@ -516,7 +516,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
                 string physicalPath = GetPath(path);
-                if (!showFileExtension)
+                if (data == null || data.Length == 0 || data[0] == null)
+                {
+                    renameResponse.Error = new ErrorDetails
+                    {
+                        Code = "400",
+                        Message = "The file metadata (data[0]) is missing or not provided."
+                    };
+                    return renameResponse;
+                }
+                if (!showFileExtension && data[0].IsFile)
                 {
                     name = name + data[0].Type;
                     newName = newName + data[0].Type;
