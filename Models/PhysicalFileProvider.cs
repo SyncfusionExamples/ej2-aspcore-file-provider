@@ -2191,6 +2191,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             folderPermission.Read = HasPermission(folderRule.Read);
             folderPermission.Upload = HasPermission(folderRule.Upload);
             folderPermission.Message = string.IsNullOrEmpty(folderRule.Message) ? string.Empty : folderRule.Message;
+            folderPermission.UploadContentFilter = folderRule.UploadContentFilter;
             return folderPermission;
         }
         protected virtual bool parentsHavePermission(FileManagerDirectoryContent fileDetails)

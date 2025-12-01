@@ -151,6 +151,8 @@ namespace EJ2APIServices.Controllers
                 new AccessRule { Path = "/Pictures/Employees/Adam.png", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Deny, Download = Permission.Deny, IsFile = true },
                 // Folder Rule
                 new AccessRule { Path = "/", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Deny, WriteContents = Permission.Deny, Upload = Permission.Deny, Download = Permission.Deny, IsFile = false },
+                // Deny based on the type
+                new AccessRule { Path = "/Music", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Allow, WriteContents = Permission.Deny, Upload = Permission.Allow, Download = Permission.Deny, UploadContentFilter = UploadContentFilter.FilesOnly, IsFile = false },
             };
             accessDetails.AccessRules = Rules;
             accessDetails.Role = "Document Manager";

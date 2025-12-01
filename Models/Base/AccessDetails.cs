@@ -45,6 +45,7 @@ namespace Syncfusion.EJ2.FileManager.Base
         /// Use this value when the application must accept any item type during upload. 
         /// </remarks> 
         All = 0,
+
         /// <summary> 
         /// Restricts uploads to files only; folder items are not permitted. 
         /// </summary> 
@@ -53,6 +54,7 @@ namespace Syncfusion.EJ2.FileManager.Base
         /// libraries or when folder creation is disabled). 
         /// </remarks> 
         FilesOnly,
+
         /// <summary> 
         /// Restricts uploads to folders only; file items are not permitted. 
         /// </summary> 
@@ -75,6 +77,7 @@ namespace Syncfusion.EJ2.FileManager.Base
         public Permission Upload { get; set; }
         public bool IsFile { get; set; }
         public string Message { get; set; }
+        public UploadContentFilter UploadContentFilter { get; set; } = UploadContentFilter.All;
     }
     public enum Permission
     {
