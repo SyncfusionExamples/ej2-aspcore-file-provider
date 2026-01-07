@@ -70,7 +70,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string[] extensions = this.allowedExtension;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
-                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
+                string parentPath;
+                if (string.IsNullOrEmpty(this.hostPath))
+                {
+                    parentPath = directory.Parent != null ? directory.Parent.FullName : directory.FullName;
+                }
+                else
+                {
+                    var combined = this.hostPath + (path != "/" ? path : "");
+                    var parent = new DirectoryInfo(combined).Parent;
+                    parentPath = parent != null ? parent.FullName : new DirectoryInfo(combined).FullName;
+                }
                 if(Path.GetFullPath(safePath) != GetFilePath(safePath))
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
@@ -516,7 +526,16 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
                 string physicalPath = GetPath(path);
-                if (!showFileExtension)
+                if (data == null || data.Length == 0 || data[0] == null)
+                {
+                    renameResponse.Error = new ErrorDetails
+                    {
+                        Code = "400",
+                        Message = "The file metadata (data[0]) is missing or not provided."
+                    };
+                    return renameResponse;
+                }
+                if (!showFileExtension && data[0].IsFile)
                 {
                     name = name + data[0].Type;
                     newName = newName + data[0].Type;
@@ -1067,7 +1086,17 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.DateModified = directory.LastWriteTime;
                 cwd.DateCreated = directory.CreationTime;
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(SanitizePath(this.hostPath)).FullName;
-                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(SanitizePath(this.hostPath + (path != "/" ? path : ""))).Parent.FullName;
+                string parentPath;
+                if (string.IsNullOrEmpty(this.hostPath))
+                {
+                    parentPath = directory.Parent != null ? directory.Parent.FullName : directory.FullName;
+                }
+                else
+                {
+                    string combined = this.hostPath + (path != "/" ? path : "");
+                    DirectoryInfo parent = new DirectoryInfo(SanitizePath(combined)).Parent;
+                    parentPath = parent != null ? parent.FullName : new DirectoryInfo(SanitizePath(combined)).FullName;
+                }
                 cwd.HasChild = CheckChild(directory.FullName);
                 cwd.Type = directory.Extension;
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
