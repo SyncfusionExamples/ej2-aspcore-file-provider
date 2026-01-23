@@ -70,7 +70,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 string[] extensions = this.allowedExtension;
                 FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(this.hostPath).FullName;
-                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(this.hostPath + (path != "/" ? path : "")).Parent.FullName;
+                string parentPath = GetParentPath(path, directory);
                 if(Path.GetFullPath(safePath) != GetFilePath(safePath))
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
@@ -1076,7 +1076,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 cwd.DateModified = directory.LastWriteTime;
                 cwd.DateCreated = directory.CreationTime;
                 string rootPath = string.IsNullOrEmpty(this.hostPath) ? this.contentRootPath : new DirectoryInfo(SanitizePath(this.hostPath)).FullName;
-                string parentPath = string.IsNullOrEmpty(this.hostPath) ? directory.Parent.FullName : new DirectoryInfo(SanitizePath(this.hostPath + (path != "/" ? path : ""))).Parent.FullName;
+                string parentPath = GetParentPath(path, directory);
                 cwd.HasChild = CheckChild(directory.FullName);
                 cwd.Type = directory.Extension;
                 cwd.FilterPath = GetRelativePath(rootPath, parentPath + Path.DirectorySeparatorChar);
@@ -2361,6 +2361,21 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
             }
 
             return path;
+        }
+
+        private string GetParentPath(string path, DirectoryInfo currentDirectory)
+        {
+            if (string.IsNullOrEmpty(this.hostPath))
+            {
+                return currentDirectory.Parent != null ? currentDirectory.Parent.FullName : currentDirectory.FullName;
+            }
+            else
+            {
+                string combined = this.hostPath + (path != "/" ? path : "");
+                string sanitizedCombined = SanitizePath(combined);
+                DirectoryInfo parent = new DirectoryInfo(sanitizedCombined).Parent;
+                return parent != null ? parent.FullName : new DirectoryInfo(sanitizedCombined).FullName;
+            }
         }
 
     }
