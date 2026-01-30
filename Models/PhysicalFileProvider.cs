@@ -33,7 +33,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
         protected string hostPath;
         protected string hostName;
         private string accessMessage = string.Empty;
-        internal HttpResponse Response;
 
         public PhysicalFileProvider()
         {
@@ -415,10 +414,6 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                 {
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
-                if ((Response.HttpContext.Request.Headers.Origin.ToString() == "https://ej2.syncfusion.com") || (Response.HttpContext.Request.Headers.Origin.ToString() == "https://blazor.syncfusion.com"))
-                {
-                    throw new UnauthorizedAccessException("File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo");
-                }
                 string physicalPath = GetPath(path);
                 string result = String.Empty;
                 for (int i = 0; i < names.Length; i++)
@@ -516,16 +511,7 @@ namespace Syncfusion.EJ2.FileManager.PhysicalFileProvider
                     throw new UnauthorizedAccessException("Access denied for Directory-traversal");
                 }
                 string physicalPath = GetPath(path);
-                if (data == null || data.Length == 0 || data[0] == null)
-                {
-                    renameResponse.Error = new ErrorDetails
-                    {
-                        Code = "400",
-                        Message = "The file metadata (data[0]) is missing or not provided."
-                    };
-                    return renameResponse;
-                }
-                if (!showFileExtension && data[0].IsFile)
+                if (!showFileExtension)
                 {
                     name = name + data[0].Type;
                     newName = newName + data[0].Type;
