@@ -47,7 +47,6 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, args.ShowHiddenItems));
                 case "delete":
                     // deletes the selected file(s) or folder(s) from the given path.
-                    this.operation.Response = Response;
                     return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names));
                 case "copy":
                     // copies the selected file(s) or folder(s) from a path and then pastes them into a given target path.
@@ -150,8 +149,8 @@ namespace EJ2APIServices.Controllers
                 new AccessRule { Path = "/Documents", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Allow, WriteContents = Permission.Deny, Upload = Permission.Deny, Download = Permission.Deny, IsFile = false },
                 // Deny writing for particular file
                 new AccessRule { Path = "/Pictures/Employees/Adam.png", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Deny, Download = Permission.Deny, IsFile = true },
-                // Folder Rule
-                new AccessRule { Path = "/", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Deny, WriteContents = Permission.Deny, Upload = Permission.Deny, Download = Permission.Deny, IsFile = false },
+                // Deny based on the type
+                new AccessRule { Path = "/Music", Role = "Document Manager", Read = Permission.Allow, Write = Permission.Deny, Copy = Permission.Allow, WriteContents = Permission.Deny, Upload = Permission.Allow, Download = Permission.Deny, UploadContentFilter = UploadContentFilter.FilesOnly, IsFile = false },
             };
             accessDetails.AccessRules = Rules;
             accessDetails.Role = "Document Manager";
