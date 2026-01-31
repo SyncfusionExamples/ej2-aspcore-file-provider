@@ -45,7 +45,6 @@ namespace EJ2APIServices.Controllers
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, args.ShowHiddenItems));
                 case "delete":
                     // deletes the selected file(s) or folder(s) from the given path.
-                    this.operation.Response = Response;
                     return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names));
                 case "copy":
                     // copies the selected file(s) or folder(s) from a path and then pastes them into a given target path.
