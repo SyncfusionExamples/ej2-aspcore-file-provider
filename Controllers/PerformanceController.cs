@@ -137,7 +137,6 @@ namespace EJ2APIServices.Controllers
                 case "read":
                     return operation.ToCamelCase(operation.GetFiles(args.Path, args.ShowHiddenItems));
                 case "delete":
-                    operation.Response = Response;
                     return operation.ToCamelCase(operation.Delete(args.Path, args.Names));
                 case "copy":
                     return operation.ToCamelCase(operation.Copy(args.Path, args.TargetPath, args.Names, args.RenameFiles, args.TargetData));
